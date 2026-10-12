@@ -1,34 +1,35 @@
-import { Button, Card, Form, Input, Typography } from 'antd'
+import { useState } from 'react'
+import { Alert, Button, Card, Form, Input, Typography } from 'antd'
 import { LockOutlined, UserOutlined } from '@ant-design/icons'
+import { isAxiosError } from 'axios'
 import { useAppDispatch, useAppSelector } from '../../app/hooks'
 import { setCredentials } from './authSlice'
+import { authService } from './authService'
+import type { LoginPayload } from './authService'
 import { tokenStorage } from '../../utils/tokenStorage'
 
-interface LoginForm {
-  email: string
-  password: string
-}
-
 export default function LoginPage() {
-
   const dispatch = useAppDispatch()
   const user = useAppSelector((state) => state.auth.user)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const onFinish = (values: LoginForm) => {
-    tokenStorage.set('fake-token')
-    dispatch(
-      setCredentials({
-        accessToken: 'fake-token',
-        user: {
-          id: 1,
-          email: values.email,
-          fullName: 'Người dùng thử',
-          role: 'ADMIN',
-          permissions: [],
-          isActive: true,
-        },
-      }),
-    )
+  const onFinish = async (values: LoginPayload) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await authService.login(values)
+      tokenStorage.set(data.accessToken)
+      dispatch(setCredentials({ user: data.user, accessToken: data.accessToken }))
+    } catch (err) {
+      if (isAxiosError(err) && err.response) {
+        setError(err.response.data?.message ?? 'Đăng nhập thất bại')
+      } else {
+        setError('Không kết nối được máy chủ')
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -46,7 +47,9 @@ export default function LoginPage() {
           Đăng nhập
         </Typography.Title>
 
-        <Form<LoginForm> layout="vertical" onFinish={onFinish}>
+        {error && <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} />}
+
+        <Form<LoginPayload> layout="vertical" onFinish={onFinish}>
           <Form.Item
             label="Email"
             name="email"
@@ -66,13 +69,14 @@ export default function LoginPage() {
             <Input.Password prefix={<LockOutlined />} />
           </Form.Item>
 
-          <Button type="primary" htmlType="submit" block>
+          <Button type="primary" htmlType="submit" block loading={loading}>
             Đăng nhập
           </Button>
         </Form>
+
         {user && (
           <Typography.Text>
-            Xin chào, {user.fullName} ({user.email})
+            Xin chào, {user.fullName} ({user.role})
           </Typography.Text>
         )}
       </Card>
