@@ -18,6 +18,7 @@ interface AuthState {
   user: User | null
   accessToken: string | null
   isInitializing: boolean
+  loggedOut: boolean
 }
 
 const savedToken = tokenStorage.get()
@@ -26,6 +27,7 @@ const initialState: AuthState = {
   user: null,
   accessToken: savedToken,
   isInitializing: savedToken !== null,
+  loggedOut: false,
 }
 
 export const initAuth = createAsyncThunk('auth/init', async () => {
@@ -41,16 +43,15 @@ const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    setCredentials(
-      state,
-      action: PayloadAction<{ user: User; accessToken: string }>,
-    ) {
+    setCredentials(state, action: PayloadAction<{ user: User; accessToken: string }>) {
       state.user = action.payload.user
       state.accessToken = action.payload.accessToken
+      state.loggedOut = false
     },
     logout(state) {
       state.user = null
       state.accessToken = null
+      state.loggedOut = true
     },
   },
   extraReducers: (builder) => {

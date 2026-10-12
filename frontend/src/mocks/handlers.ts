@@ -132,4 +132,22 @@ export const handlers = [
 
     return HttpResponse.json({ items, page, pageSize, total: filtered.length })
   }),
+
+    http.delete('/api/v1/users/:id', async ({ request, params }) => {
+    await delay(300)
+
+    const me = getCurrentUser(request)
+    if (!me) return errorResponse(401, 'UNAUTHENTICATED', 'Chưa đăng nhập hoặc token không hợp lệ')
+    if (!PERMISSIONS[me.role].includes('user:delete')) {
+      return errorResponse(403, 'FORBIDDEN', 'Bạn không có quyền thực hiện thao tác này')
+    }
+
+    const id = Number(params.id)
+    const index = users.findIndex((u) => u.id === id)
+    if (index === -1) return errorResponse(404, 'NOT_FOUND', 'Không tìm thấy người dùng')
+    if (id === me.id) return errorResponse(403, 'FORBIDDEN', 'Bạn không thể xóa chính mình')
+
+    users.splice(index, 1)
+    return new HttpResponse(null, { status: 204 })
+  }),
 ]

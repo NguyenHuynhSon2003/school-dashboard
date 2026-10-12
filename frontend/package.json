@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.4",
+    "@dicebear/collection": "^9.4.2",
+    "@dicebear/core": "^9.4.3",
     "@reduxjs/toolkit": "^2.13.0",
     "antd": "^6.6.5",
     "axios": "^1.20.0",

@@ -3,11 +3,12 @@ import { useAppSelector } from '../../app/hooks'
 
 export default function ProtectedRoute() {
   const user = useAppSelector((state) => state.auth.user)
+  const loggedOut = useAppSelector((state) => state.auth.loggedOut)
   const location = useLocation()
 
   if (!user) {
-    // Nhớ trang đang định vào để quay lại sau khi đăng nhập
-    return <Navigate to="/login" replace state={{ from: location }} />
+    // Chủ động đăng xuất thì không nhớ trang cũ, để người đăng nhập sau vào /dashboard
+    return <Navigate to="/login" replace state={loggedOut ? undefined : { from: location }} />
   }
 
   return <Outlet />
