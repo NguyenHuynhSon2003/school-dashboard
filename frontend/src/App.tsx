@@ -4,7 +4,8 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from './app/hooks'
 import { initAuth } from './features/auth/authSlice'
 import LoginPage from './features/auth/LoginPage'
-import DashboardPage from './features/dashboard/DashboardPage'
+import MainLayout from './components/layout/MainLayout'
+import { appRoutes } from './routes/routeConfig'
 import ProtectedRoute from './components/guards/ProtectedRoute'
 
 function App() {
@@ -30,7 +31,11 @@ function App() {
       <Route path="/login" element={<LoginPage />} />
 
       <Route element={<ProtectedRoute />}>
-        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route element={<MainLayout />}>
+          {appRoutes.map((r) => (
+            <Route key={r.path} path={r.path} element={r.element} />
+          ))}
+        </Route>
       </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
