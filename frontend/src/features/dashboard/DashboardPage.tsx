@@ -22,6 +22,11 @@ export default function DashboardPage() {
           <Typography.Text>
             Vai trò: <Tag color="blue">{user?.role}</Tag>
           </Typography.Text>
+          <Space wrap>
+            {user?.permissions.map((p) => (
+                <Tag key={p}>{p}</Tag>
+            ))}
+            </Space>
           <Button icon={<LogoutOutlined />} onClick={handleLogout}>
             Đăng xuất
           </Button>

@@ -2,10 +2,17 @@ import { http, HttpResponse } from 'msw'
 import type { Role } from '../features/auth/authSlice'
 
 const PERMISSIONS: Record<Role, string[]> = {
-  ADMIN: ['user:read', 'user:create', 'user:update', 'user:delete', 'role:read', 'role:update'],
-  STAFF: ['user:read', 'user:create', 'user:update'],
-  TEACHER: [],
-  STUDENT: [],
+  ADMIN: [
+    'user:read', 'user:create', 'user:update', 'user:delete',
+    'role:read', 'role:update',
+    'timetable:read', 'timetable:manage',
+  ],
+  STAFF: [
+    'user:read', 'user:create', 'user:update',
+    'timetable:read', 'timetable:manage',
+  ],
+  TEACHER: ['timetable:read_own'],
+  STUDENT: ['timetable:read_own'],
 }
 
 const users = [
