@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Alert, Button, Card, Form, Input, Typography } from 'antd'
 import { LockOutlined, UserOutlined } from '@ant-design/icons'
 import { isAxiosError } from 'axios'
+import { Navigate, useLocation } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '../../app/hooks'
 import { setCredentials } from './authSlice'
 import { authService } from './authService'
@@ -11,8 +12,17 @@ import { tokenStorage } from '../../utils/tokenStorage'
 export default function LoginPage() {
   const dispatch = useAppDispatch()
   const user = useAppSelector((state) => state.auth.user)
+  const location = useLocation()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const from =
+    (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? '/dashboard'
+
+  // Đã đăng nhập rồi thì không cần ở trang login nữa
+  if (user) {
+    return <Navigate to={from} replace />
+  }
 
   const onFinish = async (values: LoginPayload) => {
     setLoading(true)
@@ -27,7 +37,6 @@ export default function LoginPage() {
       } else {
         setError('Không kết nối được máy chủ')
       }
-    } finally {
       setLoading(false)
     }
   }
@@ -73,12 +82,6 @@ export default function LoginPage() {
             Đăng nhập
           </Button>
         </Form>
-
-        {user && (
-          <Typography.Text>
-            Xin chào, {user.fullName} ({user.role})
-          </Typography.Text>
-        )}
       </Card>
     </div>
   )
