@@ -7,6 +7,7 @@ import LoginPage from './features/auth/LoginPage'
 import MainLayout from './components/layout/MainLayout'
 import { appRoutes } from './routes/routeConfig'
 import ProtectedRoute from './components/guards/ProtectedRoute'
+import PermissionRoute from './components/guards/PermissionRoute'
 
 function App() {
   const dispatch = useAppDispatch()
@@ -33,7 +34,13 @@ function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<MainLayout />}>
           {appRoutes.map((r) => (
-            <Route key={r.path} path={r.path} element={r.element} />
+            <Route
+              key={r.path}
+              path={r.path}
+              element={
+                <PermissionRoute permissions={r.permissions}>{r.element}</PermissionRoute>
+              }
+            />
           ))}
         </Route>
       </Route>
