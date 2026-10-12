@@ -12,7 +12,8 @@ import {
   message,
 } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { DeleteOutlined, EditOutlined, SearchOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EditOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons'
+import UserFormModal from './UserFormModal'
 import { isAxiosError } from 'axios'
 import { useAppSelector } from '../../app/hooks'
 import UserAvatar from '../../components/common/UserAvatar'
@@ -107,6 +108,9 @@ export default function UserPage() {
   const canUpdate = has(PERMISSIONS.USER_UPDATE)
   const canDelete = has(PERMISSIONS.USER_DELETE)
 
+  const canCreate = has(PERMISSIONS.USER_CREATE)
+  const [modal, setModal] = useState<{ user: UserRecord | null } | null>(null)
+
   const [searchInput, setSearchInput] = useState('')
   const [role, setRole] = useState<Role | undefined>()
   const [status, setStatus] = useState<Status | undefined>()
@@ -181,7 +185,7 @@ export default function UserPage() {
               size="small"
               aria-label="Sửa"
               icon={<EditOutlined />}
-              onClick={() => message.info('Form sửa sẽ làm ở bước 9.5')}
+              onClick={() => setModal({ user: u })}
             />
           )}
           {showDelete && (
@@ -205,7 +209,16 @@ export default function UserPage() {
 
   return (
     <>
-      <Typography.Title level={3}>Người dùng</Typography.Title>
+      <Flex justify="space-between" align="center" wrap gap={8} style={{ marginBottom: 16 }}>
+        <Typography.Title level={3} style={{ margin: 0 }}>
+            Người dùng
+        </Typography.Title>
+        {canCreate && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setModal({ user: null })}>
+            Thêm người dùng
+            </Button>
+        )}
+        </Flex>
 
       <Flex wrap gap={8} style={{ marginBottom: 16 }}>
         <Input
@@ -255,6 +268,17 @@ export default function UserPage() {
           },
         }}
       />
+      {modal && (
+        <UserFormModal
+            key={modal.user?.id ?? 'new'}
+            user={modal.user}
+            onClose={() => setModal(null)}
+            onSaved={() => {
+            setModal(null)
+            setReload((r) => r + 1)
+            }}
+        />
+        )}
     </>
   )
 }

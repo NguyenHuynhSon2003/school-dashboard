@@ -25,3 +25,12 @@ export interface UserListResponse {
   pageSize: number
   total: number
 }
+
+export interface UserFormValues {
+  fullName: string
+  email: string
+  phone?: string
+  role: Role
+  password?: string
+  isActive: boolean
+}

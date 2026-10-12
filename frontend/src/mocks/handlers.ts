@@ -150,4 +150,86 @@ export const handlers = [
     users.splice(index, 1)
     return new HttpResponse(null, { status: 204 })
   }),
+
+    http.post('/api/v1/users', async ({ request }) => {
+    await delay(300)
+
+    const me = getCurrentUser(request)
+    if (!me) return errorResponse(401, 'UNAUTHENTICATED', 'Chưa đăng nhập hoặc token không hợp lệ')
+    if (!PERMISSIONS[me.role].includes('user:create')) {
+      return errorResponse(403, 'FORBIDDEN', 'Bạn không có quyền thực hiện thao tác này')
+    }
+
+    const body = (await request.json()) as {
+      fullName: string
+      email: string
+      phone?: string
+      role: Role
+      password: string
+      isActive?: boolean
+    }
+
+    if (body.role === 'ADMIN' && me.role !== 'ADMIN') {
+      return errorResponse(403, 'FORBIDDEN', 'Bạn không thể tạo tài khoản Admin')
+    }
+    if (users.some((u) => u.email.toLowerCase() === body.email.toLowerCase())) {
+      return HttpResponse.json(
+        {
+          status: 409,
+          code: 'CONFLICT',
+          message: 'Email đã tồn tại',
+          errors: [{ field: 'email', message: 'Email đã tồn tại' }],
+        },
+        { status: 409 },
+      )
+    }
+
+    const newUser: MockUser = {
+      id: Math.max(...users.map((u) => u.id)) + 1,
+      email: body.email,
+      password: body.password,
+      fullName: body.fullName,
+      phone: body.phone || null,
+      role: body.role,
+      isActive: body.isActive ?? true,
+      createdAt: new Date().toISOString(),
+      avatarUrl: null,
+    }
+    users.unshift(newUser) // hiện ở đầu danh sách để dễ thấy khi thử
+    return HttpResponse.json(toListItem(newUser), { status: 201 })
+  }),
+
+  http.put('/api/v1/users/:id', async ({ request, params }) => {
+    await delay(300)
+
+    const me = getCurrentUser(request)
+    if (!me) return errorResponse(401, 'UNAUTHENTICATED', 'Chưa đăng nhập hoặc token không hợp lệ')
+    if (!PERMISSIONS[me.role].includes('user:update')) {
+      return errorResponse(403, 'FORBIDDEN', 'Bạn không có quyền thực hiện thao tác này')
+    }
+
+    const target = users.find((u) => u.id === Number(params.id))
+    if (!target) return errorResponse(404, 'NOT_FOUND', 'Không tìm thấy người dùng')
+
+    const body = (await request.json()) as {
+      fullName: string
+      phone?: string
+      role: Role
+      isActive: boolean
+    }
+
+    if (me.role !== 'ADMIN' && (target.role === 'ADMIN' || body.role === 'ADMIN')) {
+      return errorResponse(403, 'FORBIDDEN', 'Bạn không có quyền với tài khoản Admin')
+    }
+    if (target.id === me.id && (body.role !== target.role || !body.isActive)) {
+      return errorResponse(403, 'FORBIDDEN', 'Bạn không thể tự đổi vai trò hoặc khóa chính mình')
+    }
+
+    target.fullName = body.fullName
+    target.phone = body.phone || null
+    target.role = body.role
+    target.isActive = body.isActive
+    return HttpResponse.json(toListItem(target))
+  }),
+
 ]
