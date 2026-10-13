@@ -51,7 +51,7 @@ export default function MainLayout() {
   }
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout style={{ minHeight: '100vh'  }}>
       {!isMobile && (
         <Sider trigger={null} collapsible collapsed={collapsed} theme="dark">
           <div
@@ -77,7 +77,7 @@ export default function MainLayout() {
         </Sider>
       )}
 
-      <Layout>
+      <Layout style={{ minWidth: 0 }}>
         <Header
           style={{
             background: '#fff',
@@ -104,8 +104,8 @@ export default function MainLayout() {
           </Dropdown>
         </Header>
 
-        <Content style={{ margin: 16 }}>
-          <div style={{ background: '#fff', padding: 24, borderRadius: 8, minHeight: 360 }}>
+        <Content style={{ margin: isMobile ? 8 : 16 }}>
+          <div style={{ background: '#fff', padding: isMobile ? 12 : 24, borderRadius: 8, minHeight: 360 }}>
             <Outlet />
           </div>
         </Content>

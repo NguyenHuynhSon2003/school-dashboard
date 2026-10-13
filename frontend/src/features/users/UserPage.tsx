@@ -10,6 +10,7 @@ import {
   Tag,
   Typography,
   message,
+  Grid,
 } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { DeleteOutlined, EditOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons'
@@ -104,6 +105,8 @@ interface ListResult {
 
 export default function UserPage() {
   const me = useAppSelector((state) => state.auth.user)
+  const screens = Grid.useBreakpoint()
+  const isMobile = screens.md === false
   const { has } = usePermission()
   const canUpdate = has(PERMISSIONS.USER_UPDATE)
   const canDelete = has(PERMISSIONS.USER_DELETE)
@@ -173,6 +176,8 @@ export default function UserPage() {
     title: 'Thao tác',
     key: 'actions',
     align: 'right',
+    fixed: isMobile ? 'right' : undefined,
+    width: 90,
     render: (_, u) => {
       const showEdit = canUpdate && me !== null && canEditUser(me, u)
       const showDelete = canDelete && me !== null && canDeleteUser(me, u)
@@ -227,7 +232,7 @@ export default function UserPage() {
           placeholder="Tìm theo tên, email hoặc số điện thoại"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          style={{ width: 320, maxWidth: '100%' }}
+          style={{ width: isMobile ? '100%' : 320 }}
         />
         <Select
           allowClear
@@ -235,7 +240,7 @@ export default function UserPage() {
           options={ROLE_OPTIONS}
           value={role}
           onChange={(value?: Role) => setRole(value)}
-          style={{ width: 160 }}
+          style={{ width: isMobile ? 'calc(50% - 4px)' : 160 }}
         />
         <Select
           allowClear
@@ -243,12 +248,14 @@ export default function UserPage() {
           options={STATUS_OPTIONS}
           value={status}
           onChange={(value?: Status) => setStatus(value)}
-          style={{ width: 160 }}
+          style={{ width: isMobile ? 'calc(50% - 4px)' : 160 }}
         />
       </Flex>
 
       <Table<UserRecord>
         rowKey="id"
+        size={isMobile ? 'small' : 'middle'}
+        scroll={{ x: 'max-content' }}
         columns={tableColumns}
         dataSource={result?.items ?? []}
         loading={loading}
@@ -257,11 +264,14 @@ export default function UserPage() {
           current: page,
           pageSize,
           total: result?.total ?? 0,
-          showSizeChanger: true,
-          showTotal: (t, range) => `${range[0]}–${range[1]} trên ${t} người dùng`,
+          simple: isMobile,
+          showSizeChanger: !isMobile,
+          showTotal: isMobile
+            ? undefined
+            : (t, range) => `${range[0]}–${range[1]} trên ${t} người dùng`,
           onChange: (p, ps) => {
             if (ps !== pageSize) {
-              setPageSize(ps) // đổi cỡ trang làm chữ ký đổi, trang tự về 1
+              setPageSize(ps)
             } else {
               setPageState({ page: p, sig: filterSig })
             }
