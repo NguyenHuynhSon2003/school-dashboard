@@ -44,31 +44,51 @@ export class UsersService {
   }
 
   // Hỗ trợ phân trang và tìm kiếm theo tên, email hoặc số điện thoại (Contract v3)
-  async findAllPaginated(page: number = 1, pageSize: number = 10, search?: string): Promise<any> {
+  async findAllPaginated(
+    page: number = 1, 
+    pageSize: number = 10, 
+    search?: string, 
+    role?: string, 
+    isActive?: boolean
+  ): Promise<any> {
     const skip = (page - 1) * pageSize;
     
-    const queryOptions: any = {
+    // Xây dựng điều kiện query động
+    const whereConditions: any = {};
+
+    if (isActive !== undefined) {
+      whereConditions.isActive = isActive;
+    }
+
+    if (role) {
+      // Lọc theo tên role trong bảng quan hệ roles
+      whereConditions.role = { name: role };
+    }
+
+    let whereClause: any = whereConditions;
+
+    if (search) {
+      // Kết hợp điều kiện lọc với tìm kiếm từ khóa (email, fullName, phone)
+      whereClause = [
+        { ...whereConditions, email: Like(`%${search}%`) },
+        { ...whereConditions, fullName: Like(`%${search}%`) },
+        { ...whereConditions, phone: Like(`%${search}%`) },
+      ];
+    }
+
+    const [users, total] = await this.userRepository.findAndCount({
+      where: whereClause,
       relations: { role: true },
       skip,
       take: pageSize,
       order: { id: 'DESC' },
-    };
-
-    if (search) {
-      queryOptions.where = [
-        { email: Like(`%${search}%`) },
-        { fullName: Like(`%${search}%`) },
-        { phone: Like(`%${search}%`) },
-      ];
-    }
-
-    const [users, total] = await this.userRepository.findAndCount(queryOptions);
+    });
 
     const items = users.map(user => {
       const { passwordHash, ...result } = user;
       return {
         ...result,
-        role: user.role ? user.role.name : null, // Đảm bảo trả về chuỗi role name (ADMIN, STAFF...) nếu frontend cần
+        role: user.role ? user.role.name : null,
       };
     });
 
@@ -111,11 +131,23 @@ export class UsersService {
       throw new NotFoundException(`Không tìm thấy user với ID: ${id}`);
     }
 
+    // Xác định roleId mới (ưu tiên roleId gửi lên, hoặc quy đổi từ role chuỗi)
+    let newRoleId = updateUserDto.roleId ? Number(updateUserDto.roleId) : undefined;
+    if (!newRoleId && updateUserDto.role) {
+      const roleMapping: Record<string, number> = {
+        ADMIN: 1,
+        STAFF: 2,
+        TEACHER: 3,
+        STUDENT: 4,
+      };
+      newRoleId = roleMapping[updateUserDto.role];
+    }
+
     // 1. Không tự đổi role hoặc tự khóa chính mình
     if (currentUser.id === id) {
       if (
         updateUserDto.isActive === false || 
-        (updateUserDto.roleId && Number(updateUserDto.roleId) !== targetUser.roleId)
+        (newRoleId !== undefined && newRoleId !== targetUser.roleId)
       ) {
         throw new ForbiddenException('Bạn không thể tự khóa hoặc tự đổi role của chính mình');
       }
@@ -123,19 +155,28 @@ export class UsersService {
 
     // 2. Staff không được sửa user là ADMIN, hoặc gán role ADMIN
     if (currentUser.role === 'STAFF') {
-      if (targetUser.role?.name === 'ADMIN' || (updateUserDto.roleId && Number(updateUserDto.roleId) === 1)) {
+      if (
+        targetUser.role?.name === 'ADMIN' || 
+        newRoleId === 1
+      ) {
         throw new ForbiddenException('Staff không có quyền thao tác với tài khoản hoặc phân quyền ADMIN');
       }
     }
 
-    // Cập nhật các trường được truyền lên
+    // Cập nhật các trường thông tin
     if (updateUserDto.fullName !== undefined) targetUser.fullName = updateUserDto.fullName;
     if (updateUserDto.phone !== undefined) targetUser.phone = updateUserDto.phone;
-    if (updateUserDto.roleId !== undefined) targetUser.roleId = Number(updateUserDto.roleId);
     if (updateUserDto.isActive !== undefined) targetUser.isActive = updateUserDto.isActive;
     if (updateUserDto.avatarUrl !== undefined) targetUser.avatarUrl = updateUserDto.avatarUrl;
+    
+    if (newRoleId !== undefined) {
+      targetUser.roleId = newRoleId;
+    }
 
+    // Lưu vào CSDL
     await this.userRepository.save(targetUser);
+
+    // Trả về dữ liệu đã được query lại kèm thông tin Role mới nhất
     return this.findOne(id);
   }
 

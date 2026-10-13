@@ -19,8 +19,22 @@ export class UsersController {
     @Query('page') page: number = 1,
     @Query('pageSize') pageSize: number = 10,
     @Query('search') search?: string,
+    @Query('role') role?: string,
+    @Query('isActive') isActive?: string,
   ) {
-    return this.usersService.findAllPaginated(Number(page), Number(pageSize), search);
+    // Chuyển đổi 'active'/'locked' hoặc 'true'/'false' từ query string sang kiểu boolean (nếu có)
+    let activeBoolean: boolean | undefined = undefined;
+    if (isActive !== undefined) {
+      activeBoolean = isActive === 'true' || isActive === 'active';
+    }
+
+    return this.usersService.findAllPaginated(
+      Number(page), 
+      Number(pageSize), 
+      search, 
+      role, 
+      activeBoolean
+    );
   }
 
   @Get(':id')
