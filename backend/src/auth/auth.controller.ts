@@ -24,7 +24,10 @@ export class AuthController {
     // req.user lấy từ JwtStrategy sau khi giải mã token
     const userId = req.user.userId || req.user.sub;
     const user = await this.usersService.findOne(userId);
-    const roleName = user.role?.name;
+
+    // usersService.findOne() đã đổi role thành chuỗi (ADMIN, STAFF...),
+    // nên dùng trực tiếp user.role, không dùng user.role?.name
+    const roleName: string = user.role;
 
     return {
       id: user.id,
@@ -32,8 +35,10 @@ export class AuthController {
       fullName: user.fullName,
       phone: user.phone,
       role: roleName,
-      permissions: getPermissionsByRole(roleName),
+      permissions: getPermissionsByRole(roleName) || [],
       isActive: user.isActive,
+      createdAt: user.createdAt,
+      avatarUrl: user.avatarUrl || null,
     };
   }
 }

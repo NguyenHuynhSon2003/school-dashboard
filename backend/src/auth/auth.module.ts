@@ -1,17 +1,23 @@
 import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service.js';
 import { AuthController } from './auth.controller.js';
 import { UsersModule } from '../users/users.module.js';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from './jwt.strategy.js';
+
 @Module({
   imports: [
     UsersModule,
     PassportModule,
-    JwtModule.register({
-      secret: 'YOUR_SECRET_KEY_CHANGE_THIS', // Khớp với jwt.strategy.ts
-      signOptions: { expiresIn: '1d' },
+    JwtModule.registerAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        secret: config.get<string>('JWT_SECRET', 'YOUR_SECRET_KEY_CHANGE_THIS'),
+        // Giây; 900 = 15 phút, khớp với expiresIn trả về trong login()
+        signOptions: { expiresIn: Number(config.get('JWT_EXPIRES_IN', 900)) },
+      }),
     }),
   ],
   controllers: [AuthController],

@@ -1,6 +1,6 @@
 import {
   Entity, PrimaryGeneratedColumn, Column, ManyToOne,
-  JoinColumn, CreateDateColumn,  type Relation
+  JoinColumn, CreateDateColumn, type Relation
 } from 'typeorm';
 import { Role } from '../../roles/entities/role.entity.js';
 
@@ -18,7 +18,7 @@ export class User {
   @Column({ name: 'full_name' })
   fullName: string;
 
- @Column({ type: 'varchar', length: 20, nullable: true })
+  @Column({ type: 'varchar', length: 20, nullable: true })
   phone: string | null;
 
   @Column({ name: 'is_active', default: true })
@@ -27,10 +27,11 @@ export class User {
   @Column({ name: 'role_id' })
   roleId: number;
 
- @Column({ type: 'varchar', length: 255, nullable: true })
+  // Cột trong database là avatar_url (cần chạy ALTER TABLE thêm cột này)
+  @Column({ name: 'avatar_url', type: 'varchar', length: 255, nullable: true })
   avatarUrl: string | null;
 
-@ManyToOne(() => Role, (role) => role.users, { eager: true })
+  @ManyToOne(() => Role, (role) => role.users, { eager: true })
   @JoinColumn({ name: 'role_id' })
   role: Relation<Role>;
 

@@ -7,7 +7,7 @@ import { userService } from './userService'
 import type { UserFormValues, UserRecord } from './userTypes'
 
 interface Props {
-  user: UserRecord | null // null = thêm mới
+  user: UserRecord | null
   onClose: () => void
   onSaved: () => void
 }
@@ -22,32 +22,48 @@ export default function UserFormModal({ user, onClose, onSaved }: Props) {
   const isEdit = user !== null
   const isSelf = user !== null && me?.id === user.id
 
-  // Staff không được chọn vai trò Admin
   const roleOptions = ALL_ROLES.filter((r) => me?.role === 'ADMIN' || r !== 'ADMIN').map((r) => ({
     value: r,
     label: r,
   }))
+
+  const getRoleId = (roleName: string): number => {
+    switch (roleName) {
+      case 'ADMIN': return 1;
+      case 'STAFF': return 2;
+      case 'TEACHER': return 3;
+      case 'STUDENT': return 4;
+      default: return 4;
+    }
+  }
 
   const handleOk = async () => {
     let values: UserFormValues
     try {
       values = await form.validateFields()
     } catch {
-      return // còn ô chưa hợp lệ, Ant Design đã hiện lỗi
+      return
     }
 
     setSaving(true)
     try {
+      const roleName = values.role || 'STUDENT'
+      const roleId = getRoleId(roleName)
+
       if (user) {
         await userService.update(user.id, {
           fullName: values.fullName,
           phone: values.phone,
-          role: values.role,
+          role: roleName,
+          roleId: roleId,
           isActive: values.isActive,
         })
         message.success('Đã cập nhật người dùng')
       } else {
-        await userService.create(values)
+        await userService.create({
+          ...values,
+          roleId: roleId,
+        })
         message.success('Đã thêm người dùng')
       }
       onSaved()

@@ -9,9 +9,12 @@ export interface User {
   id: number
   email: string
   fullName: string
+  phone?: string
   role: Role
   permissions: string[]
   isActive: boolean
+  createdAt?: string
+  avatarUrl?: string | null
 }
 
 interface AuthState {
@@ -70,4 +73,3 @@ const authSlice = createSlice({
 
 export const { setCredentials, logout } = authSlice.actions
 export default authSlice.reducer
-

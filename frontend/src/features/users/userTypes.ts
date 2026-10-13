@@ -31,6 +31,7 @@ export interface UserFormValues {
   email: string
   phone?: string
   role: Role
+  roleId?: number
   password?: string
   isActive: boolean
 }
