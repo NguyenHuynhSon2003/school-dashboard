@@ -48,9 +48,7 @@ function LessonCell({ lesson, forTeacher }: { lesson: Lesson; forTeacher: boolea
   return (
     <div>
       <div style={{ fontWeight: 500 }}>{lesson.subject}</div>
-      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-        {forTeacher ? lesson.className : lesson.teacherName} · {lesson.room}
-      </Typography.Text>
+      {forTeacher ? `Lớp ${lesson.className}` : lesson.teacherName} · Phòng {lesson.room}
     </div>
   )
 }

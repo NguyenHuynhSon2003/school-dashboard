@@ -20,18 +20,12 @@ import { useAppSelector } from '../../app/hooks'
 import UserAvatar from '../../components/common/UserAvatar'
 import { useDebounce } from '../../hooks/useDebounce'
 import { usePermission } from '../../hooks/usePermission'
-import { PERMISSIONS } from '../../utils/constants'
+import { PERMISSIONS, ROLE_COLORS } from '../../utils/constants'
 import type { Role } from '../auth/authSlice'
 import { canDeleteUser, canEditUser } from './userRules'
 import { userService } from './userService'
 import type { UserRecord } from './userTypes'
 
-const ROLE_COLORS: Record<Role, string> = {
-  ADMIN: 'purple',
-  STAFF: 'blue',
-  TEACHER: 'green',
-  STUDENT: 'orange',
-}
 
 const ROLE_OPTIONS = [
   { value: 'ADMIN', label: 'Admin' },

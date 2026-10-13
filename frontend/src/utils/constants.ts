@@ -1,3 +1,6 @@
+import type { Role } from '../features/auth/authSlice'
+
+
 export const PERMISSIONS = {
   USER_READ: 'user:read',
   USER_CREATE: 'user:create',
@@ -11,3 +14,10 @@ export const PERMISSIONS = {
 } as const
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS]
+
+export const ROLE_COLORS: Record<Role, string> = {
+  ADMIN: 'purple',
+  STAFF: 'blue',
+  TEACHER: 'green',
+  STUDENT: 'orange',
+}

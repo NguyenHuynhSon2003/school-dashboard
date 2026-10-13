@@ -73,11 +73,68 @@ function errorResponse(status: number, code: string, message: string) {
   return HttpResponse.json({ status, code, message }, { status })
 }
 
-// Token giả có dạng "mock-token-<id>"
-function getCurrentUser(request: Request) {
+// ===== Token và phiên đăng nhập (mock) =====
+const ACCESS_TTL_SECONDS = 60 // dev: 60 giây để thử hết hạn; giống thật thì đổi thành 900 (15 phút)
+const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 ngày
+const REFRESH_KEY = 'mockRefreshSession'
+
+// Token giả có dạng "mock-token-<id>.<thời điểm hết hạn tính bằng ms>"
+// Token không có phần hết hạn (ví dụ "mock-token-1") được coi là không bao giờ hết hạn
+function makeAccessToken(userId: number) {
+  return `mock-token-${userId}.${Date.now() + ACCESS_TTL_SECONDS * 1000}`
+}
+
+function parseToken(request: Request) {
   const auth = request.headers.get('Authorization') ?? ''
-  const id = Number(auth.replace('Bearer mock-token-', ''))
-  return users.find((u) => u.id === id) ?? null
+  const match = /^Bearer mock-token-(\d+)(?:\.(\d+))?$/.exec(auth)
+  if (!match) return { user: null, expired: false }
+
+  const user = users.find((u) => u.id === Number(match[1])) ?? null
+  const expired = match[2] !== undefined && Date.now() > Number(match[2])
+  return { user, expired }
+}
+
+
+// Token giả có dạng "mock-token-<id>"
+// function getCurrentUser(request: Request) {
+//   const auth = request.headers.get('Authorization') ?? ''
+//   const id = Number(auth.replace('Bearer mock-token-', ''))
+//   return users.find((u) => u.id === id) ?? null
+// }
+function getCurrentUser(request: Request) {
+  const { user, expired } = parseToken(request)
+  return expired ? null : user
+}
+
+// Token hết hạn thì trả TOKEN_EXPIRED để frontend biết cần gọi refresh
+function unauthorized(request: Request) {
+  const { user, expired } = parseToken(request)
+  if (user && expired) return errorResponse(401, 'TOKEN_EXPIRED', 'Phiên đăng nhập đã hết hạn')
+  return errorResponse(401, 'UNAUTHENTICATED', 'Chưa đăng nhập hoặc token không hợp lệ')
+}
+
+// Giả lập httpOnly cookie chứa refresh token (backend thật dùng cookie, frontend không đụng tới)
+interface RefreshSession {
+  userId: number
+  expiresAt: number
+}
+
+function startRefreshSession(userId: number) {
+  const session: RefreshSession = { userId, expiresAt: Date.now() + REFRESH_TTL_MS }
+  localStorage.setItem(REFRESH_KEY, JSON.stringify(session))
+}
+
+function readRefreshSession(): RefreshSession | null {
+  try {
+    const raw = localStorage.getItem(REFRESH_KEY)
+    return raw ? (JSON.parse(raw) as RefreshSession) : null
+  } catch {
+    return null
+  }
+}
+
+function endRefreshSession() {
+  localStorage.removeItem(REFRESH_KEY)
 }
 
 // ===== Thời khóa biểu (demo) =====
@@ -150,16 +207,44 @@ export const handlers = [
     if (!user) return errorResponse(401, 'INVALID_CREDENTIALS', 'Sai email hoặc mật khẩu')
     if (!user.isActive) return errorResponse(403, 'ACCOUNT_DISABLED', 'Tài khoản đã bị khóa')
 
+    startRefreshSession(user.id) // giả lập server set cookie refresh token
+
     return HttpResponse.json({
-      accessToken: `mock-token-${user.id}`,
-      expiresIn: 900,
+      accessToken: makeAccessToken(user.id),
+      expiresIn: ACCESS_TTL_SECONDS,
       user: toPublicUser(user),
     })
   }),
 
+  http.post('/api/v1/auth/refresh', async () => {
+    await delay(200)
+
+    const session = readRefreshSession()
+    if (!session || Date.now() > session.expiresAt) {
+      endRefreshSession()
+      return errorResponse(401, 'UNAUTHENTICATED', 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại')
+    }
+
+    const user = users.find((u) => u.id === session.userId)
+    if (!user || !user.isActive) {
+      endRefreshSession()
+      return errorResponse(401, 'UNAUTHENTICATED', 'Phiên đăng nhập không còn hiệu lực')
+    }
+
+    return HttpResponse.json({
+      accessToken: makeAccessToken(user.id),
+      expiresIn: ACCESS_TTL_SECONDS,
+    })
+  }),
+
+  http.post('/api/v1/auth/logout', () => {
+    endRefreshSession() // giả lập server thu hồi refresh token và xóa cookie
+    return new HttpResponse(null, { status: 204 })
+  }),
+
   http.get('/api/v1/auth/me', ({ request }) => {
     const user = getCurrentUser(request)
-    if (!user) return errorResponse(401, 'UNAUTHENTICATED', 'Chưa đăng nhập hoặc token không hợp lệ')
+    if (!user) return unauthorized(request)
     return HttpResponse.json(toPublicUser(user))
   }),
 
@@ -167,7 +252,7 @@ export const handlers = [
     await delay(400)
 
     const me = getCurrentUser(request)
-    if (!me) return errorResponse(401, 'UNAUTHENTICATED', 'Chưa đăng nhập hoặc token không hợp lệ')
+    if (!me) return unauthorized(request)
     if (!PERMISSIONS[me.role].includes('user:read')) {
       return errorResponse(403, 'FORBIDDEN', 'Bạn không có quyền thực hiện thao tác này')
     }
@@ -199,7 +284,7 @@ export const handlers = [
     await delay(300)
 
     const me = getCurrentUser(request)
-    if (!me) return errorResponse(401, 'UNAUTHENTICATED', 'Chưa đăng nhập hoặc token không hợp lệ')
+    if (!me) return unauthorized(request)
     if (!PERMISSIONS[me.role].includes('user:delete')) {
       return errorResponse(403, 'FORBIDDEN', 'Bạn không có quyền thực hiện thao tác này')
     }
@@ -217,7 +302,7 @@ export const handlers = [
     await delay(300)
 
     const me = getCurrentUser(request)
-    if (!me) return errorResponse(401, 'UNAUTHENTICATED', 'Chưa đăng nhập hoặc token không hợp lệ')
+    if (!me) return unauthorized(request)
     if (!PERMISSIONS[me.role].includes('user:create')) {
       return errorResponse(403, 'FORBIDDEN', 'Bạn không có quyền thực hiện thao tác này')
     }
@@ -265,7 +350,7 @@ export const handlers = [
     await delay(300)
 
     const me = getCurrentUser(request)
-    if (!me) return errorResponse(401, 'UNAUTHENTICATED', 'Chưa đăng nhập hoặc token không hợp lệ')
+    if (!me) return unauthorized(request)
     if (!PERMISSIONS[me.role].includes('user:update')) {
       return errorResponse(403, 'FORBIDDEN', 'Bạn không có quyền thực hiện thao tác này')
     }
@@ -298,7 +383,7 @@ export const handlers = [
     await delay(300)
 
     const me = getCurrentUser(request)
-    if (!me) return errorResponse(401, 'UNAUTHENTICATED', 'Chưa đăng nhập hoặc token không hợp lệ')
+    if (!me) return unauthorized(request)
     if (!PERMISSIONS[me.role].includes('role:read')) {
       return errorResponse(403, 'FORBIDDEN', 'Bạn không có quyền thực hiện thao tác này')
     }
@@ -323,7 +408,7 @@ export const handlers = [
     await delay(300)
 
     const me = getCurrentUser(request)
-    if (!me) return errorResponse(401, 'UNAUTHENTICATED', 'Chưa đăng nhập hoặc token không hợp lệ')
+    if (!me) return unauthorized(request)
     if (!PERMISSIONS[me.role].includes('timetable:read')) {
       return errorResponse(403, 'FORBIDDEN', 'Bạn không có quyền thực hiện thao tác này')
     }
@@ -338,7 +423,7 @@ export const handlers = [
     await delay(400)
 
     const me = getCurrentUser(request)
-    if (!me) return errorResponse(401, 'UNAUTHENTICATED', 'Chưa đăng nhập hoặc token không hợp lệ')
+    if (!me) return unauthorized(request)
 
     const canReadAll = PERMISSIONS[me.role].includes('timetable:read')
     const canReadOwn = PERMISSIONS[me.role].includes('timetable:read_own')

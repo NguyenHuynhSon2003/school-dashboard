@@ -1,21 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Typography, Card, Tag, Row, Col, Spin, Alert, Space } from 'antd'
-import axiosClient from '../../api/axiosClient'
-
-interface RoleItem {
-  id: number
-  name: string
-  description: string
-  permissions: string[]
-  userCount: number
-}
-
-const ROLE_COLORS: Record<string, string> = {
-  ADMIN: 'magenta',
-  STAFF: 'blue',
-  TEACHER: 'green',
-  STUDENT: 'orange',
-}
+import { Alert, Card, Col, Row, Space, Spin, Tag, Typography } from 'antd'
+import { ROLE_COLORS } from '../../utils/constants'
+import type { Role } from '../auth/authSlice'
+import { roleService } from './roleService'
+import type { RoleItem } from './roleService'
 
 export default function RolePage() {
   const [roles, setRoles] = useState<RoleItem[]>([])
@@ -23,29 +11,23 @@ export default function RolePage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    let isMounted = true
+    let ignore = false
 
     const fetchRoles = async () => {
       try {
-        const res = await axiosClient.get<RoleItem[]>('/roles')
-        if (isMounted) {
-          setRoles(res.data)
-        }
+        const data = await roleService.list()
+        if (!ignore) setRoles(data)
       } catch {
-        if (isMounted) {
-          setError('Không thể tải danh sách vai trò. Vui lòng thử lại.')
-        }
+        if (!ignore) setError('Không thể tải danh sách vai trò. Vui lòng thử lại.')
       } finally {
-        if (isMounted) {
-          setLoading(false)
-        }
+        if (!ignore) setLoading(false)
       }
     }
 
     fetchRoles()
 
     return () => {
-      isMounted = false
+      ignore = true
     }
   }, [])
 
@@ -77,14 +59,14 @@ export default function RolePage() {
               title={
                 <Space>
                   <span>{role.name}</span>
-                  <Tag color={ROLE_COLORS[role.name] ?? 'default'}>
+                  <Tag color={ROLE_COLORS[role.name as Role] ?? 'default'}>
                     {role.userCount} người dùng
                   </Tag>
                 </Space>
               }
               style={{ height: '100%' }}
             >
-              <p style={{ color: '#595959', marginBottom: 16 }}>{role.description}</p>
+              <Typography.Paragraph type="secondary">{role.description}</Typography.Paragraph>
               <Typography.Text strong style={{ display: 'block', marginBottom: 8, fontSize: 13 }}>
                 Danh sách quyền:
               </Typography.Text>
