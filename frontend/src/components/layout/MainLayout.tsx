@@ -13,6 +13,7 @@ import { logout } from '../../features/auth/authSlice'
 import { usePermission } from '../../hooks/usePermission'
 import { appRoutes } from '../../routes/routeConfig'
 import { tokenStorage } from '../../utils/tokenStorage'
+import { authService } from '../../features/auth/authService'
 
 const { Header, Sider, Content } = Layout
 
@@ -39,7 +40,12 @@ export default function MainLayout() {
     setDrawerOpen(false)
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await authService.logout() // báo server thu hồi refresh token
+    } catch {
+      // lỗi mạng cũng không sao, vẫn đăng xuất phía trình duyệt
+    }
     tokenStorage.clear()
     dispatch(logout())
   }

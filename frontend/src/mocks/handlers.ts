@@ -74,7 +74,7 @@ function errorResponse(status: number, code: string, message: string) {
 }
 
 // ===== Token và phiên đăng nhập (mock) =====
-const ACCESS_TTL_SECONDS = 60 // dev: 60 giây để thử hết hạn; giống thật thì đổi thành 900 (15 phút)
+const ACCESS_TTL_SECONDS = 900 // dev: 60 giây để thử hết hạn; giống thật thì đổi thành 900 (15 phút)
 const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 ngày
 const REFRESH_KEY = 'mockRefreshSession'
 

@@ -12,9 +12,19 @@ export interface LoginResponse {
   user: User
 }
 
+export interface RefreshResponse {
+  accessToken: string
+  expiresIn: number
+}
+
 export const authService = {
   login: (payload: LoginPayload) =>
     axiosClient.post<LoginResponse>('/auth/login', payload).then((res) => res.data),
 
   me: () => axiosClient.get<User>('/auth/me').then((res) => res.data),
+
+  refresh: () =>
+    axiosClient.post<RefreshResponse>('/auth/refresh').then((res) => res.data),
+
+  logout: () => axiosClient.post<void>('/auth/logout').then(() => undefined),
 }

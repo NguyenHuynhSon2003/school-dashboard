@@ -30,7 +30,7 @@ export default function LoginPage() {
     try {
       const data = await authService.login(values)
       tokenStorage.set(data.accessToken)
-      dispatch(setCredentials({ user: data.user, accessToken: data.accessToken }))
+      dispatch(setCredentials({ user: data.user }))
     } catch (err) {
       if (isAxiosError(err) && err.response) {
         setError(err.response.data?.message ?? 'Đăng nhập thất bại')

@@ -1,5 +1,6 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit'
 import type { PayloadAction } from '@reduxjs/toolkit'
+import { refreshAccessToken } from '../../api/axiosClient'
 import { tokenStorage } from '../../utils/tokenStorage'
 import { authService } from './authService'
 
@@ -16,25 +17,24 @@ export interface User {
 
 interface AuthState {
   user: User | null
-  accessToken: string | null
   isInitializing: boolean
   loggedOut: boolean
 }
 
-const savedToken = tokenStorage.get()
-
 const initialState: AuthState = {
   user: null,
-  accessToken: savedToken,
-  isInitializing: savedToken !== null,
+  // Luôn thử khôi phục phiên khi mở app (access token chỉ nằm trong bộ nhớ nên F5 là mất)
+  isInitializing: true,
   loggedOut: false,
 }
 
+// Khôi phục phiên: xin access token mới bằng cookie refresh, rồi lấy thông tin user
 export const initAuth = createAsyncThunk('auth/init', async () => {
   try {
+    await refreshAccessToken()
     return await authService.me()
   } catch (error) {
-    tokenStorage.clear() // token hỏng hoặc hết hạn thì xóa luôn
+    tokenStorage.clear()
     throw error
   }
 })
@@ -43,15 +43,18 @@ const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    setCredentials(state, action: PayloadAction<{ user: User; accessToken: string }>) {
+    setCredentials(state, action: PayloadAction<{ user: User }>) {
       state.user = action.payload.user
-      state.accessToken = action.payload.accessToken
       state.loggedOut = false
     },
+    // Người dùng chủ động đăng xuất
     logout(state) {
       state.user = null
-      state.accessToken = null
       state.loggedOut = true
+    },
+    // Hết phiên (refresh thất bại): khác logout ở chỗ vẫn nhớ trang đang xem để quay lại sau khi đăng nhập
+    sessionExpired(state) {
+      state.user = null
     },
   },
   extraReducers: (builder) => {
@@ -62,12 +65,10 @@ const authSlice = createSlice({
       })
       .addCase(initAuth.rejected, (state) => {
         state.user = null
-        state.accessToken = null
         state.isInitializing = false
       })
   },
 })
 
-export const { setCredentials, logout } = authSlice.actions
+export const { setCredentials, logout, sessionExpired } = authSlice.actions
 export default authSlice.reducer
-
