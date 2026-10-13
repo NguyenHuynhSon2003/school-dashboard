@@ -13,6 +13,7 @@ import { logout } from '../../features/auth/authSlice'
 import { usePermission } from '../../hooks/usePermission'
 import { appRoutes } from '../../routes/routeConfig'
 import { tokenStorage } from '../../utils/tokenStorage'
+import { authService } from '../../features/auth/authService' // Đảm bảo đường dẫn import service của bạn đúng
 
 const { Header, Sider, Content } = Layout
 
@@ -39,9 +40,19 @@ export default function MainLayout() {
     setDrawerOpen(false)
   }
 
-  const handleLogout = () => {
-    tokenStorage.clear()
-    dispatch(logout())
+  const handleLogout = async () => {
+    try {
+      // Gọi API lên backend để xóa refreshToken trong CSDL
+      await authService.logout()
+    } catch (error) {
+      console.error('Lỗi khi đăng xuất ở backend:', error)
+    } finally {
+      // Dọn dẹp token ở client và chuyển về trang đăng nhập
+      tokenStorage.clear()
+      localStorage.removeItem('refreshToken')
+      dispatch(logout())
+      navigate('/login')
+    }
   }
 
   const userMenu: MenuProps = {
@@ -51,7 +62,7 @@ export default function MainLayout() {
   }
 
   return (
-    <Layout style={{ minHeight: '100vh'  }}>
+    <Layout style={{ minHeight: '100vh' }}>
       {!isMobile && (
         <Sider trigger={null} collapsible collapsed={collapsed} theme="dark">
           <div
@@ -104,8 +115,8 @@ export default function MainLayout() {
           </Dropdown>
         </Header>
 
-        <Content style={{ margin: isMobile ? 8 : 16 }}>
-          <div style={{ background: '#fff', padding: isMobile ? 12 : 24, borderRadius: 8, minHeight: 360 }}>
+        <Content style={{ margin: isMobile ? 8 : 16, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ background: '#fff', padding: isMobile ? 12 : 24, borderRadius: 8, minHeight: 360, width: '100%', flex: 1 }}>
             <Outlet />
           </div>
         </Content>

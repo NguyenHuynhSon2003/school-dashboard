@@ -18,15 +18,23 @@ export class AuthController {
     return this.authService.login(user);
   }
 
+  @Post('refresh')
+  async refresh(@Body('refreshToken') refreshToken: string) {
+    return this.authService.refreshToken(refreshToken);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('logout')
+  async logout(@Request() req: any) {
+    const userId = req.user.userId || req.user.sub;
+    return this.authService.logout(userId);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get('me')
   async getProfile(@Request() req: any) {
-    // req.user lấy từ JwtStrategy sau khi giải mã token
     const userId = req.user.userId || req.user.sub;
     const user = await this.usersService.findOne(userId);
-
-    // usersService.findOne() đã đổi role thành chuỗi (ADMIN, STAFF...),
-    // nên dùng trực tiếp user.role, không dùng user.role?.name
     const roleName: string = user.role;
 
     return {

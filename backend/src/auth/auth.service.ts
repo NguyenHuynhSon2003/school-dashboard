@@ -40,15 +40,29 @@ export class AuthService {
   }
  
   async login(user: any) {
-    // role có thể là relation (object có name) hoặc string
     const roleName: string = user.role?.name ?? user.role;
     const permissions = getPermissionsByRole(roleName) || [];
  
     const payload = { email: user.email, sub: user.id, role: roleName };
-    const accessToken = this.jwtService.sign(payload);
+    
+    // Tạo Access Token (sống ngắn: 15 phút)
+    const accessToken = this.jwtService.sign(payload, {
+      secret: process.env.JWT_SECRET || 'access-secret-key',
+      expiresIn: '15m',
+    });
+
+    // Tạo Refresh Token (sống dài: 7 ngày)
+    const refreshToken = this.jwtService.sign(payload, {
+      secret: process.env.JWT_REFRESH_SECRET || 'refresh-secret-key',
+      expiresIn: '7d',
+    });
+
+    // Lưu Refresh Token vào Database
+    await this.usersService.updateRefreshToken(user.id, refreshToken);
  
     return {
       accessToken,
+      refreshToken,
       expiresIn: 900, // 15 phút
       user: {
         id: user.id,
@@ -56,11 +70,46 @@ export class AuthService {
         fullName: user.fullName,
         phone: user.phone,
         role: roleName,
-        permissions, // Bắt buộc có trường này
+        permissions,
         isActive: user.isActive,
         createdAt: user.createdAt,
         avatarUrl: user.avatarUrl || null,
       },
     };
+  }
+
+  async refreshToken(oldRefreshToken: string) {
+    try {
+      // Giải mã và kiểm tra Refresh Token bằng khóa riêng biệt
+      const payload = this.jwtService.verify(oldRefreshToken, {
+        secret: process.env.JWT_REFRESH_SECRET || 'refresh-secret-key',
+      });
+
+      const user = await this.usersService.findOne(payload.sub);
+      if (!user || user.refreshToken !== oldRefreshToken) {
+        throw new UnauthorizedException('Refresh Token không hợp lệ');
+      }
+
+      if (!user.isActive) {
+        throw new ForbiddenException('Tài khoản đã bị khóa');
+      }
+
+      // Tạo Access Token mới
+      const newPayload = { email: user.email, sub: user.id, role: user.role };
+      const accessToken = this.jwtService.sign(newPayload, {
+        secret: process.env.JWT_SECRET || 'access-secret-key',
+        expiresIn: '15m',
+      });
+
+      return { accessToken };
+    } catch (err) {
+      throw new UnauthorizedException('Refresh Token đã hết hạn hoặc không hợp lệ');
+    }
+  }
+
+  async logout(userId: number) {
+    // Xóa refresh token trong CSDL khi đăng xuất
+    await this.usersService.updateRefreshToken(userId, null);
+    return { message: 'Đăng xuất thành công' };
   }
 }

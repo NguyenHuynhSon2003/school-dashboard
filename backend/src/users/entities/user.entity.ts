@@ -31,6 +31,9 @@ export class User {
   @Column({ name: 'avatar_url', type: 'varchar', length: 255, nullable: true })
   avatarUrl: string | null;
 
+  @Column({ type: 'text', nullable: true })
+refreshToken: string | null;
+
   @ManyToOne(() => Role, (role) => role.users, { eager: true })
   @JoinColumn({ name: 'role_id' })
   role: Relation<Role>;

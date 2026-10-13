@@ -151,4 +151,10 @@ export class UsersService {
     }
     await this.userRepository.remove(user);
   }
+
+  // Trong users.service.ts
+async updateRefreshToken(userId: number, refreshToken: string | null): Promise<void> {
+  // Nếu bạn dùng TypeORM:
+  await this.userRepository.update(userId, { refreshToken });
+}
 }
