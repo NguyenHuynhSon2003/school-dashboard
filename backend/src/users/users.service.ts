@@ -144,7 +144,7 @@ export class UsersService {
     }
 
     // 1. Không tự đổi role hoặc tự khóa chính mình
-    if (currentUser.id === id) {
+    if (currentUser && currentUser.id === id) {
       if (
         updateUserDto.isActive === false || 
         (newRoleId !== undefined && newRoleId !== targetUser.roleId)
@@ -153,8 +153,9 @@ export class UsersService {
       }
     }
 
-    // 2. Staff không được sửa user là ADMIN, hoặc gán role ADMIN
-    if (currentUser.role === 'STAFF') {
+    // 2. Kiểm tra nếu currentUser là STAFF thì chặn phân quyền ADMIN
+    const currentRoleName = currentUser?.role?.name || currentUser?.role;
+    if (currentRoleName === 'STAFF') {
       if (
         targetUser.role?.name === 'ADMIN' || 
         newRoleId === 1
@@ -163,7 +164,7 @@ export class UsersService {
       }
     }
 
-    // Cập nhật các trường thông tin
+    // Cập nhật các trường thông tin nếu có truyền lên
     if (updateUserDto.fullName !== undefined) targetUser.fullName = updateUserDto.fullName;
     if (updateUserDto.phone !== undefined) targetUser.phone = updateUserDto.phone;
     if (updateUserDto.isActive !== undefined) targetUser.isActive = updateUserDto.isActive;
@@ -171,6 +172,7 @@ export class UsersService {
     
     if (newRoleId !== undefined) {
       targetUser.roleId = newRoleId;
+      targetUser.role = { id: newRoleId } as any;
     }
 
     // Lưu vào CSDL

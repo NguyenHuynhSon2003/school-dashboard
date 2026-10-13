@@ -256,7 +256,7 @@ export default function UserPage() {
         locale={{ emptyText: 'Không tìm thấy người dùng phù hợp' }}
         pagination={{
           current: page,
-          pageSize,
+          pageSize: 5,
           total: result?.total ?? 0,
           simple: isMobile,
           showSizeChanger: !isMobile,
