@@ -1,7 +1,53 @@
+import { useEffect } from 'react'
+import { Spin } from 'antd'
+import { Navigate, Route, Routes } from 'react-router-dom'
+import { useAppDispatch, useAppSelector } from './app/hooks'
+import { initAuth } from './features/auth/authSlice'
 import LoginPage from './features/auth/LoginPage'
+import MainLayout from './components/layout/MainLayout'
+import { appRoutes } from './routes/routeConfig'
+import ProtectedRoute from './components/guards/ProtectedRoute'
+import PermissionRoute from './components/guards/PermissionRoute'
 
 function App() {
-  return <LoginPage />
+  const dispatch = useAppDispatch()
+  const isInitializing = useAppSelector((state) => state.auth.isInitializing)
+
+  useEffect(() => {
+    if (isInitializing) {
+      dispatch(initAuth())
+    }
+  }, [dispatch, isInitializing])
+
+  if (isInitializing) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
+        <Spin size="large" />
+      </div>
+    )
+  }
+
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+
+      <Route element={<ProtectedRoute />}>
+        <Route element={<MainLayout />}>
+          {appRoutes.map((r) => (
+            <Route
+              key={r.path}
+              path={r.path}
+              element={
+                <PermissionRoute permissions={r.permissions}>{r.element}</PermissionRoute>
+              }
+            />
+          ))}
+        </Route>
+      </Route>
+
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+    </Routes>
+  )
 }
 
 export default App
