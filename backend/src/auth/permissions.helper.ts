@@ -19,8 +19,13 @@ export function getPermissionsByRole(roleName: string): string[] {
         'timetable:manage',
       ];
     case 'TEACHER':
+      return [
+        'timetable:read_own',
+      ];
     case 'STUDENT':
-      return ['timetable:read_own'];
+      return [
+        'timetable:read_own',
+      ];
     default:
       return [];
   }

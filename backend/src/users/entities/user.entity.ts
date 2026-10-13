@@ -18,14 +18,17 @@ export class User {
   @Column({ name: 'full_name' })
   fullName: string;
 
-  @Column({ nullable: true })
-  phone: string;
+ @Column({ type: 'varchar', length: 20, nullable: true })
+  phone: string | null;
 
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
   @Column({ name: 'role_id' })
   roleId: number;
+
+ @Column({ type: 'varchar', length: 255, nullable: true })
+  avatarUrl: string | null;
 
 @ManyToOne(() => Role, (role) => role.users, { eager: true })
   @JoinColumn({ name: 'role_id' })
