@@ -80,6 +80,68 @@ function getCurrentUser(request: Request) {
   return users.find((u) => u.id === id) ?? null
 }
 
+// ===== Thời khóa biểu (demo) =====
+const CLASSES = ['10A1', '10A2']
+
+const TEACHER_SLOTS = [
+  { teacherId: 3, subject: 'Toán' },
+  { teacherId: 7, subject: 'Ngữ văn' },
+  { teacherId: 8, subject: 'Tiếng Anh' },
+  { teacherId: 9, subject: 'Vật lý' },
+  { teacherId: 10, subject: 'Hóa học' },
+  { teacherId: 11, subject: 'Sinh học' },
+]
+
+const PERIODS = [
+  { start: '07:30', end: '08:15' },
+  { start: '08:20', end: '09:05' },
+  { start: '09:20', end: '10:05' },
+  { start: '10:10', end: '10:55' },
+  { start: '11:00', end: '11:45' },
+]
+
+interface MockLesson {
+  id: number
+  dayOfWeek: number
+  period: number
+  startTime: string
+  endTime: string
+  subject: string
+  className: string
+  teacherId: number
+  room: string
+}
+
+// Hai lớp lệch nhau 3 vị trí trong danh sách giáo viên nên một giáo viên không bao giờ dạy 2 lớp cùng lúc
+const lessons: MockLesson[] = CLASSES.flatMap((className, c) =>
+  Array.from({ length: 5 }, (_, d) =>
+    PERIODS.map((p, i) => {
+      const slot = TEACHER_SLOTS[(d * 2 + i + c * 3) % TEACHER_SLOTS.length]
+      return {
+        id: c * 100 + d * 10 + i + 1,
+        dayOfWeek: d + 1,
+        period: i + 1,
+        startTime: p.start,
+        endTime: p.end,
+        subject: slot.subject,
+        className,
+        teacherId: slot.teacherId,
+        room: `A10${c + 1}`,
+      }
+    }),
+  ).flat(),
+)
+
+// Học sinh id chẵn học lớp 10A1, id lẻ học lớp 10A2
+function classOf(u: MockUser) {
+  if (u.role !== 'STUDENT') return null
+  return u.id % 2 === 0 ? '10A1' : '10A2'
+}
+
+function toOwner(u: MockUser) {
+  return { id: u.id, fullName: u.fullName, role: u.role, className: classOf(u) }
+}
+
 export const handlers = [
   http.post('/api/v1/auth/login', async ({ request }) => {
     const body = (await request.json()) as { email: string; password: string }
@@ -230,6 +292,89 @@ export const handlers = [
     target.role = body.role
     target.isActive = body.isActive
     return HttpResponse.json(toListItem(target))
+  }),
+
+  http.get('/api/v1/roles', async ({ request }) => {
+    await delay(300)
+
+    const me = getCurrentUser(request)
+    if (!me) return errorResponse(401, 'UNAUTHENTICATED', 'Chưa đăng nhập hoặc token không hợp lệ')
+    if (!PERMISSIONS[me.role].includes('role:read')) {
+      return errorResponse(403, 'FORBIDDEN', 'Bạn không có quyền thực hiện thao tác này')
+    }
+
+    const rolesData = [
+      { id: 1, name: 'ADMIN', description: 'Quản trị viên hệ thống, có toàn quyền quản trị và quản lý người dùng.' },
+      { id: 2, name: 'STAFF', description: 'Giáo vụ, quản lý tài khoản người dùng và điều phối thời khóa biểu.' },
+      { id: 3, name: 'TEACHER', description: 'Giáo viên bộ môn, theo dõi lịch giảng dạy cá nhân.' },
+      { id: 4, name: 'STUDENT', description: 'Học sinh, theo dõi lịch học tập cá nhân.' },
+    ]
+
+    const result = rolesData.map((r) => ({
+      ...r,
+      permissions: PERMISSIONS[r.name as Role],
+      userCount: users.filter((u) => u.role === r.name).length,
+    }))
+
+    return HttpResponse.json(result)
+  }),
+
+    http.get('/api/v1/timetable/people', async ({ request }) => {
+    await delay(300)
+
+    const me = getCurrentUser(request)
+    if (!me) return errorResponse(401, 'UNAUTHENTICATED', 'Chưa đăng nhập hoặc token không hợp lệ')
+    if (!PERMISSIONS[me.role].includes('timetable:read')) {
+      return errorResponse(403, 'FORBIDDEN', 'Bạn không có quyền thực hiện thao tác này')
+    }
+
+    const people = users
+      .filter((u) => u.role === 'TEACHER' || u.role === 'STUDENT')
+      .map(toOwner)
+    return HttpResponse.json(people)
+  }),
+
+  http.get('/api/v1/timetable', async ({ request }) => {
+    await delay(400)
+
+    const me = getCurrentUser(request)
+    if (!me) return errorResponse(401, 'UNAUTHENTICATED', 'Chưa đăng nhập hoặc token không hợp lệ')
+
+    const canReadAll = PERMISSIONS[me.role].includes('timetable:read')
+    const canReadOwn = PERMISSIONS[me.role].includes('timetable:read_own')
+    if (!canReadAll && !canReadOwn) {
+      return errorResponse(403, 'FORBIDDEN', 'Bạn không có quyền thực hiện thao tác này')
+    }
+
+    const params = new URL(request.url).searchParams
+    const userIdParam = params.get('userId')
+    const weekStart = params.get('weekStart') ?? '' // demo: lịch lặp lại mỗi tuần
+
+    let target: MockUser | undefined
+    if (canReadAll) {
+      if (!userIdParam) return errorResponse(422, 'VALIDATION_ERROR', 'Thiếu userId')
+      target = users.find((u) => u.id === Number(userIdParam))
+      if (!target) return errorResponse(404, 'NOT_FOUND', 'Không tìm thấy người dùng')
+    } else {
+      // Chỉ được xem lịch của mình, hỏi lịch người khác là bị từ chối
+      if (userIdParam && Number(userIdParam) !== me.id) {
+        return errorResponse(403, 'FORBIDDEN', 'Bạn chỉ được xem thời khóa biểu của chính mình')
+      }
+      target = me
+    }
+
+    const className = classOf(target)
+    const items = lessons
+      .filter((l) =>
+        target.role === 'TEACHER' ? l.teacherId === target.id : className !== null && l.className === className,
+      )
+      .map(({ teacherId, ...rest }) => ({
+        ...rest,
+        teacherName: users.find((u) => u.id === teacherId)?.fullName ?? 'Chưa phân công',
+      }))
+      .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.period - b.period)
+
+    return HttpResponse.json({ weekStart, owner: toOwner(target), items })
   }),
 
 ]
