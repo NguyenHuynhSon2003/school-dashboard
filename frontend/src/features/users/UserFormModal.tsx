@@ -87,7 +87,7 @@ export default function UserFormModal({ user, onClose, onSaved }: Props) {
       onOk={handleOk}
       onCancel={onClose}
       confirmLoading={saving}
-      maskClosable={false}
+      mask={{ closable: false }}
     >
       <Form
         form={form}
