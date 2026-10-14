@@ -30,6 +30,8 @@ export default function LoginPage() {
     try {
       const data = await authService.login(values)
       tokenStorage.set(data.accessToken)
+      // Lưu thêm refreshToken vào localStorage để dùng khi cần thiết
+      localStorage.setItem('refreshToken', data.refreshToken)
       dispatch(setCredentials({ user: data.user, accessToken: data.accessToken }))
     } catch (err) {
       if (isAxiosError(err) && err.response) {
