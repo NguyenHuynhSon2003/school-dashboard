@@ -15,7 +15,8 @@ setAuthFailureHandler(() => {
 })
 
 async function enableMocking() {
-  if (!import.meta.env.DEV) return
+  // Mặc định gọi backend thật. Chỉ bật mock khi đặt VITE_USE_MOCK=true
+  if (!import.meta.env.DEV || import.meta.env.VITE_USE_MOCK !== 'true') return
   const { worker } = await import('./mocks/browser')
   return worker.start({ onUnhandledRequest: 'bypass' })
 }
