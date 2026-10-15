@@ -9,6 +9,7 @@ import type { TimetableResponse } from '../timetable/timetableTypes'
 import { userService } from '../users/userService'
 import type { UserListParams } from '../users/userTypes'
 
+// khai báo ngày giờ thực tế
 const TODAY_TEXT = new Date().toLocaleDateString('vi-VN', {
   weekday: 'long',
   day: '2-digit',
@@ -16,7 +17,7 @@ const TODAY_TEXT = new Date().toLocaleDateString('vi-VN', {
   year: 'numeric',
 })
 
-interface Stats {
+interface Stats { // dữ liệu hiển thị ở trang tổng quan
   total: number
   students: number
   teachers: number

@@ -15,9 +15,9 @@ interface Props {
 const ALL_ROLES: Role[] = ['ADMIN', 'STAFF', 'TEACHER', 'STUDENT']
 
 export default function UserFormModal({ user, onClose, onSaved }: Props) {
-  const me = useAppSelector((state) => state.auth.user)
-  const [form] = Form.useForm<UserFormValues>()
-  const [saving, setSaving] = useState(false)
+  const me = useAppSelector((state) => state.auth.user) // thông tin user đang đăng nhập
+  const [form] = Form.useForm<UserFormValues>() //form quản lý biểu mẫu
+  const [saving, setSaving] = useState(false) // trạng thái lưu
 
   const isEdit = user !== null
   const isSelf = user !== null && me?.id === user.id
@@ -29,16 +29,16 @@ export default function UserFormModal({ user, onClose, onSaved }: Props) {
   }))
 
   const handleOk = async () => {
-    let values: UserFormValues
+    let values: UserFormValues // hứng data user bằng biến values
     try {
-      values = await form.validateFields()
+      values = await form.validateFields() // kiểm tra lỗi định dạng
     } catch {
       return // còn ô chưa hợp lệ, Ant Design đã hiện lỗi
     }
 
-    setSaving(true)
+    setSaving(true) //hiệu ứng lưu
     try {
-      if (user) {
+      if (user) { // nếu user tồn tại, gọi hàm update từ userService
         await userService.update(user.id, {
           fullName: values.fullName,
           phone: values.phone,

@@ -118,7 +118,7 @@ export default function UserPage() {
 
   const search = useDebounce(searchInput.trim(), 400)
 
-  // Chữ ký của bộ lọc: đổi bộ lọc (hoặc cỡ trang) thì tự về trang 1
+
   const filterSig = `${search}|${role ?? ''}|${status ?? ''}|${pageSize}`
   const page = pageState.sig === filterSig ? pageState.page : 1
 

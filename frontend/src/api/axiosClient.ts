@@ -1,10 +1,11 @@
 import axios from 'axios'
 import type { InternalAxiosRequestConfig } from 'axios'
 import { tokenStorage } from '../utils/tokenStorage'
+import { refreshTokenStorage } from '../utils/refreshTokenStorage'
 
 const BASE_URL = '/api/v1'
 
-const axiosClient = axios.create({
+const axiosClient = axios.create({// liên kết URL gốc với các tên miền khác nhau
   baseURL: BASE_URL,
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true, // để trình duyệt gửi kèm cookie refresh token
@@ -22,16 +23,19 @@ export function setAuthFailureHandler(handler: () => void) {
 // Promise dùng chung: nhiều request cùng cần refresh thì chỉ gọi API một lần
 let refreshPromise: Promise<string> | null = null
 
-export function refreshAccessToken(): Promise<string> {
-  if (!refreshPromise) {
+// lấy accessToken mới từ refreshToken
+export function refreshAccessToken(): Promise<string> { // hàm trả về chuỗi token
+  if (!refreshPromise) { // kiểm tra có request refresh nào chạy ko
     refreshPromise = refreshClient
-      .post<{ accessToken: string; expiresIn: number }>('/auth/refresh')
-      .then((res) => {
-        tokenStorage.set(res.data.accessToken)
-        return res.data.accessToken
+     .post<{ accessToken: string; expiresIn?: number }>('/auth/refresh', {
+       refreshToken: refreshTokenStorage.get(), // lấy refresh token đang lưu trong LocalStorage gửi lên server
+     })
+      .then((res) => { //xử lý thành công
+        tokenStorage.set(res.data.accessToken) // lưu token vào storage
+        return res.data.accessToken // trả chuỗi token ra để giải quyết promise
       })
       .finally(() => {
-        refreshPromise = null
+        refreshPromise = null // đưa về trạng thái ban đầu và đợi token hết hạn lần nữa
       })
   }
   return refreshPromise
@@ -39,7 +43,7 @@ export function refreshAccessToken(): Promise<string> {
 
 // Tự gắn token vào mọi request nếu đang có token
 axiosClient.interceptors.request.use((config) => {
-  const token = tokenStorage.get()
+  const token = tokenStorage.get() // lấy token hiện tại
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }

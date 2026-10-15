@@ -18,22 +18,23 @@ import { authService } from '../../features/auth/authService'
 const { Header, Sider, Content } = Layout
 
 export default function MainLayout() {
-  const dispatch = useAppDispatch()
-  const navigate = useNavigate()
-  const location = useLocation()
-  const user = useAppSelector((state) => state.auth.user)
-  const { hasAny } = usePermission()
+  const dispatch = useAppDispatch() //gửi các hành động lên Redux store
+  const navigate = useNavigate() //điểu hướng trang
+  const location = useLocation() //URL
+  const user = useAppSelector((state) => state.auth.user) //lấy tt user đẽ hiển thị trên navigate
+  const { hasAny } = usePermission() // kiểm tra quyền hạn chi tiết
 
-  const screens = Grid.useBreakpoint()
-  const isMobile = screens.lg === false
+  const screens = Grid.useBreakpoint() //grid của thư viện Ant
+  const isMobile = screens.lg === false 
 
-  const [collapsed, setCollapsed] = useState(false)
+  //Hook quản lý trạng thái hiển thị thanh điều hướng
+  const [collapsed, setCollapsed] = useState(false)  
   const [drawerOpen, setDrawerOpen] = useState(false)
 
   // Chỉ giữ các mục mà user có quyền
   const menuItems: MenuProps['items'] = appRoutes
-    .filter((r) => !r.permissions || hasAny(r.permissions))
-    .map((r) => ({ key: r.path, icon: r.icon, label: r.label }))
+    .filter((r) => !r.permissions || hasAny(r.permissions)) // sàng lọc trang mà tài khoản xem đc
+    .map((r) => ({ key: r.path, icon: r.icon, label: r.label })) // dịch lại path của router sang key
 
   const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
     navigate(key)
