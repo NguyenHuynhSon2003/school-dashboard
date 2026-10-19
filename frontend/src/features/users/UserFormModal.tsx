@@ -2,43 +2,44 @@ import { useState } from 'react'
 import { Form, Input, Modal, Select, Switch, message } from 'antd'
 import { isAxiosError } from 'axios'
 import { useAppSelector } from '../../app/hooks'
-import type { Role } from '../auth/authSlice'
 import { userService } from './userService'
+import type { RoleItem } from '../roles/roleService'
 import type { UserFormValues, UserRecord } from './userTypes'
 
 interface Props {
   user: UserRecord | null // null = thêm mới
+  roles: RoleItem[]
   onClose: () => void
   onSaved: () => void
 }
 
-const ALL_ROLES: Role[] = ['ADMIN', 'STAFF', 'TEACHER', 'STUDENT']
-
-export default function UserFormModal({ user, onClose, onSaved }: Props) {
-  const me = useAppSelector((state) => state.auth.user) // thông tin user đang đăng nhập
-  const [form] = Form.useForm<UserFormValues>() //form quản lý biểu mẫu
-  const [saving, setSaving] = useState(false) // trạng thái lưu
+export default function UserFormModal({ user, roles, onClose, onSaved }: Props) {
+  const me = useAppSelector((state) => state.auth.user)
+  const [form] = Form.useForm<UserFormValues>()
+  const [saving, setSaving] = useState(false)
 
   const isEdit = user !== null
   const isSelf = user !== null && me?.id === user.id
 
-  // Staff không được chọn vai trò Admin
-  const roleOptions = ALL_ROLES.filter((r) => me?.role === 'ADMIN' || r !== 'ADMIN').map((r) => ({
-    value: r,
-    label: r,
-  }))
+  // Staff không được chọn vai trò ADMIN (dựa trên tên role thực tế từ DB)
+  const roleOptions = roles
+    .filter((r) => me?.role === 'ADMIN' || r.name !== 'ADMIN')
+    .map((r) => ({
+      value: r.name,
+      label: r.name,
+    }))
 
   const handleOk = async () => {
-    let values: UserFormValues // hứng data user bằng biến values
+    let values: UserFormValues
     try {
-      values = await form.validateFields() // kiểm tra lỗi định dạng
+      values = await form.validateFields()
     } catch {
-      return // còn ô chưa hợp lệ, Ant Design đã hiện lỗi
+      return
     }
 
-    setSaving(true) //hiệu ứng lưu
+    setSaving(true)
     try {
-      if (user) { // nếu user tồn tại, gọi hàm update từ userService
+      if (user) {
         await userService.update(user.id, {
           fullName: values.fullName,
           phone: values.phone,
@@ -116,7 +117,7 @@ export default function UserFormModal({ user, onClose, onSaved }: Props) {
         </Form.Item>
 
         <Form.Item label="Vai trò" name="role" rules={[{ required: true, message: 'Chọn vai trò' }]}>
-          <Select options={roleOptions} disabled={isSelf} />
+          <Select options={roleOptions} disabled={isSelf} placeholder="Chọn vai trò cho tài khoản" />
         </Form.Item>
 
         {!isEdit && (

@@ -337,7 +337,7 @@ export const handlers = [
 
   http.post('/api/v1/auth/logout', () => {
     endRefreshSession() // giả lập server thu hồi refresh token và xóa cookie
-    return new HttpResponse(null, { status: 204 })
+    return HttpResponse.json({ message: 'Đăng xuất thành công' })
   }),
 
   http.get('/api/v1/auth/me', ({ request }) => {
@@ -392,8 +392,9 @@ export const handlers = [
     if (index === -1) return errorResponse(404, 'NOT_FOUND', 'Không tìm thấy người dùng')
     if (id === me.id) return errorResponse(403, 'FORBIDDEN', 'Bạn không thể xóa chính mình')
 
+    const removed = users[index]
     users.splice(index, 1)
-    return new HttpResponse(null, { status: 204 })
+    return HttpResponse.json({ message: `Đã xóa người dùng ${removed.fullName}` })
   }),
 
     http.post('/api/v1/users', async ({ request }) => {
@@ -560,7 +561,7 @@ export const handlers = [
     }
 
     roles.splice(index, 1)
-    return new HttpResponse(null, { status: 204 })
+    return HttpResponse.json({ message: `Đã xóa vai trò ${role.name}` })
   }),
 
     http.get('/api/v1/timetable/people', async ({ request }) => {
