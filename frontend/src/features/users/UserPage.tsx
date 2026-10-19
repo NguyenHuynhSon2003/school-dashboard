@@ -115,8 +115,8 @@ export default function UserPage() {
   const [pageState, setPageState] = useState({ page: 1, sig: '' })
   const [reload, setReload] = useState(0)
   const [result, setResult] = useState<ListResult | null>(null)
-
-  const search = useDebounce(searchInput.trim(), 400)
+// Tìm kiếm được debounce để tránh gửi quá nhiều request khi người dùng gõ
+  const search = useDebounce(searchInput.trim(), 2000)
 
   // Chữ ký của bộ lọc: đổi bộ lọc (hoặc cỡ trang) thì tự về trang 1
   const filterSig = `${search}|${role ?? ''}|${status ?? ''}|${pageSize}`

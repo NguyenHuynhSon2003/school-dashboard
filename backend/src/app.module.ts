@@ -4,7 +4,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { RolesModule } from './roles/roles.module.js';
 import { UsersModule } from './users/users.module.js';
 import { AuthModule } from './auth/auth.module.js';
-import { TimetableModule } from './timetable/timetable.module.js'; // 1. Import module timetable
+import { TimetableModule } from './timetable/timetable.module.js';
+
 
 @Module({
   imports: [
@@ -25,7 +26,7 @@ import { TimetableModule } from './timetable/timetable.module.js'; // 1. Import 
     RolesModule,
     UsersModule,
     AuthModule,
-    TimetableModule, // 2. Thêm vào đây để nhận diện route /timetable
+    TimetableModule, // 2. Thêm vào đây để nhận diện route /timetable, rolesmodule, usersmodule, authmodule
   ],
   controllers: [],
   providers: [],

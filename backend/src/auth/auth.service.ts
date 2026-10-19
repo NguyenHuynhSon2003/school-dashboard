@@ -2,13 +2,14 @@ import { Injectable, UnauthorizedException, ForbiddenException } from '@nestjs/c
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service.js';
-import { getPermissionsByRole } from './permissions.helper.js';
+import { PermissionsService } from '../permissions/permissions.service.js';
  
 @Injectable()
 export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
+    private permissionsService: PermissionsService,
   ) {}
  
   async validateUser(email: string, pass: string): Promise<any> {
@@ -39,12 +40,26 @@ export class AuthService {
     return result;
   }
  
-  async login(user: any) {
+  // Dựng object user dùng chung cho login và refresh (quyền đọc từ DB)
+  async buildUser(user: any) {
     const roleName: string = user.role?.name ?? user.role;
-    const permissions = getPermissionsByRole(roleName) || [];
- 
-    const payload = { email: user.email, sub: user.id, role: roleName };
-    
+    return {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      phone: user.phone,
+      role: roleName,
+      permissions: await this.permissionsService.getCodesByRoleName(roleName),
+      isActive: user.isActive,
+      createdAt: user.createdAt,
+      avatarUrl: user.avatarUrl || null,
+    };
+  }
+
+  async login(user: any) {
+    const userInfo = await this.buildUser(user);
+    const payload = { email: user.email, sub: user.id, role: userInfo.role };
+
     // Tạo Access Token (sống ngắn: 15 phút)
     const accessToken = this.jwtService.sign(payload, {
       secret: process.env.JWT_SECRET || 'access-secret-key',
@@ -59,22 +74,12 @@ export class AuthService {
 
     // Lưu Refresh Token vào Database
     await this.usersService.updateRefreshToken(user.id, refreshToken);
- 
+
     return {
       accessToken,
       refreshToken,
       expiresIn: 900, // 15 phút
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        phone: user.phone,
-        role: roleName,
-        permissions,
-        isActive: user.isActive,
-        createdAt: user.createdAt,
-        avatarUrl: user.avatarUrl || null,
-      },
+      user: userInfo,
     };
   }
 
@@ -85,7 +90,8 @@ export class AuthService {
         secret: process.env.JWT_REFRESH_SECRET || 'refresh-secret-key',
       });
 
-      const user = await this.usersService.findOne(payload.sub);
+      // includeSecrets = true: cần refreshToken để so sánh
+      const user = await this.usersService.findOne(payload.sub, true);
       if (!user || user.refreshToken !== oldRefreshToken) {
         throw new UnauthorizedException('Refresh Token không hợp lệ');
       }
@@ -95,13 +101,14 @@ export class AuthService {
       }
 
       // Tạo Access Token mới
-      const newPayload = { email: user.email, sub: user.id, role: user.role };
+      const newPayload = { email: user.email, sub: user.id, role: user.role?.name ?? user.role };
       const accessToken = this.jwtService.sign(newPayload, {
         secret: process.env.JWT_SECRET || 'access-secret-key',
         expiresIn: '15m',
       });
 
-      return { accessToken };
+      // Trả luôn user (kèm quyền mới nhất) để frontend khỏi gọi thêm /auth/me khi F5
+      return { accessToken, expiresIn: 900, user: await this.buildUser(user) };
     } catch (err) {
       throw new UnauthorizedException('Refresh Token đã hết hạn hoặc không hợp lệ');
     }

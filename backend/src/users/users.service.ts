@@ -5,12 +5,14 @@ import * as bcrypt from 'bcrypt';
 import { User } from './entities/user.entity.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
+import { PermissionsService } from '../permissions/permissions.service.js';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    private permissionsService: PermissionsService,
   ) {}
 
   async create(createUserDto: CreateUserDto, currentUser: any): Promise<any> {
@@ -19,10 +21,8 @@ export class UsersService {
       throw new ConflictException('Email đã tồn tại trong hệ thống');
     }
 
-    // Kiểm tra quyền: Staff không được tạo user có role ADMIN (roleId 1)
-    if (currentUser && currentUser.role === 'STAFF' && Number(createUserDto.roleId) === 1) {
-      throw new ForbiddenException('Staff không có quyền tạo tài khoản ADMIN');
-    }
+    // Không được tạo user có role nhiều quyền hơn mình (thay cho check STAFF/roleId cứng)
+    await this.permissionsService.assertCanAssignRole(currentUser?.permissions ?? [], Number(createUserDto.roleId));
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(createUserDto.password, salt);
@@ -43,7 +43,7 @@ export class UsersService {
     return this.findOne(savedUser.id);
   }
 
-  // Hỗ trợ phân trang và tìm kiếm theo tên, email hoặc số điện thoại (Contract v3)
+  // Hỗ trợ phân trang và tìm kiếm theo tên, email hoặc số điện thoại
   async findAllPaginated(
     page: number = 1, 
     pageSize: number = 10, 
@@ -85,7 +85,7 @@ export class UsersService {
     });
 
     const items = users.map(user => {
-      const { passwordHash, ...result } = user;
+      const { passwordHash, refreshToken, ...result } = user;
       return {
         ...result,
         role: user.role ? user.role.name : null,
@@ -100,7 +100,8 @@ export class UsersService {
     };
   }
 
-  async findOne(id: number): Promise<any> {
+  // includeSecrets = true chỉ dùng nội bộ (AuthService so sánh refresh token), không bao giờ trả ra API
+  async findOne(id: number, includeSecrets = false): Promise<any> {
     const user = await this.userRepository.findOne({
       where: { id },
       relations: { role: true } as any,
@@ -108,9 +109,10 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException(`Không tìm thấy user với ID: ${id}`);
     }
-    const { passwordHash, ...result } = user;
+    const { passwordHash, refreshToken, ...result } = user;
     return {
       ...result,
+      ...(includeSecrets ? { refreshToken } : {}),
       role: user.role ? user.role.name : null,
     };
   }
@@ -134,13 +136,7 @@ export class UsersService {
     // Xác định roleId mới (ưu tiên roleId gửi lên, hoặc quy đổi từ role chuỗi)
     let newRoleId = updateUserDto.roleId ? Number(updateUserDto.roleId) : undefined;
     if (!newRoleId && updateUserDto.role) {
-      const roleMapping: Record<string, number> = {
-        ADMIN: 1,
-        STAFF: 2,
-        TEACHER: 3,
-        STUDENT: 4,
-      };
-      newRoleId = roleMapping[updateUserDto.role];
+      newRoleId = await this.permissionsService.findRoleIdByName(updateUserDto.role);
     }
 
     // 1. Không tự đổi role hoặc tự khóa chính mình
@@ -153,15 +149,11 @@ export class UsersService {
       }
     }
 
-    // 2. Kiểm tra nếu currentUser là STAFF thì chặn phân quyền ADMIN
-    const currentRoleName = currentUser?.role?.name || currentUser?.role;
-    if (currentRoleName === 'STAFF') {
-      if (
-        targetUser.role?.name === 'ADMIN' || 
-        newRoleId === 1
-      ) {
-        throw new ForbiddenException('Staff không có quyền thao tác với tài khoản hoặc phân quyền ADMIN');
-      }
+    // 2. Không được sửa user hoặc gán role có quyền cao hơn mình
+    const myPermissions: string[] = currentUser?.permissions ?? [];
+    await this.permissionsService.assertCanAssignRole(myPermissions, targetUser.roleId);
+    if (newRoleId !== undefined && newRoleId !== targetUser.roleId) {
+      await this.permissionsService.assertCanAssignRole(myPermissions, newRoleId);
     }
 
     // Cập nhật các trường thông tin nếu có truyền lên
@@ -192,12 +184,24 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException(`Không tìm thấy user với ID: ${id}`);
     }
+    await this.permissionsService.assertCanAssignRole(currentUser?.permissions ?? [], user.roleId);
     await this.userRepository.remove(user);
   }
 
-  // Trong users.service.ts
+  // Số liệu cho Dashboard (1 request thay vì 4). Quyền kiểm tra ở controller: user:read
+  async getStats() {
+    const [total, students, teachers, locked] = await Promise.all([
+      this.userRepository.count(),
+      this.userRepository.count({ where: { role: { name: 'STUDENT' } } }),
+      this.userRepository.count({ where: { role: { name: 'TEACHER' } } }),
+      this.userRepository.count({ where: { isActive: false } }),
+    ]);
+    return { total, students, teachers, locked };
+  }
+
+  // Nơi lưu Refresh Token vào Database
 async updateRefreshToken(userId: number, refreshToken: string | null): Promise<void> {
-  // Nếu bạn dùng TypeORM:
+
   await this.userRepository.update(userId, { refreshToken });
 }
 }
