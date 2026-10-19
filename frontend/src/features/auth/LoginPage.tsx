@@ -23,16 +23,14 @@ export default function LoginPage() {
   if (user) {
     return <Navigate to={from} replace />
   }
-
+  //khi bấm login
   const onFinish = async (values: LoginPayload) => {
     setLoading(true)
     setError(null)
     try {
-      const data = await authService.login(values)
-      tokenStorage.set(data.accessToken)
-      // Lưu thêm refreshToken vào localStorage để dùng khi cần thiết
-      localStorage.setItem('refreshToken', data.refreshToken)
-      dispatch(setCredentials({ user: data.user, accessToken: data.accessToken }))
+      const data = await authService.login(values) //send u&p to api
+      tokenStorage.set(data.accessToken) //save token
+      dispatch(setCredentials({ user: data.user })) //request save user to redux
     } catch (err) {
       if (isAxiosError(err) && err.response) {
         setError(err.response.data?.message ?? 'Đăng nhập thất bại')
@@ -69,7 +67,7 @@ export default function LoginPage() {
               { type: 'email', message: 'Email không hợp lệ' },
             ]}
           >
-            <Input prefix={<UserOutlined />} placeholder="admin@school.edu" />
+            <Input prefix={<UserOutlined />} placeholder="user@example.com" />
           </Form.Item>
 
           <Form.Item

@@ -1,18 +1,20 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, HttpCode, Patch } from '@nestjs/common';
 import { RolesService } from './roles.service.js';
 import { JwtAuthGuard } from '../auth/jwt-auth/jwt-auth.guard.js';
 import { PermissionsGuard } from '../permissions/permissions.guard.js';
 import { RequirePermissions } from '../permissions/require-permissions.decorator.js';
+
 
 @Controller('roles')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class RolesController {
   constructor(private readonly rolesService: RolesService) {}
 
+  // Body: { name, description, permissions: [...] }
   @Post()
   @RequirePermissions('role:create')
-  create(@Body() createRoleDto: any) {
-    return this.rolesService.create(createRoleDto);
+  create(@Body() dto: any) {
+    return this.rolesService.create(dto);
   }
 
   @Get()
@@ -27,26 +29,27 @@ export class RolesController {
     return this.rolesService.findOne(+id);
   }
 
-  @Put(':id')
+  // Frontend gọi PATCH với { name, description, permissions }
+  @Patch(':id')
   @RequirePermissions('role:update')
-  update(@Param('id') id: string, @Body() updateRoleDto: any) {
-    return this.rolesService.update(+id, updateRoleDto);
+  update(@Param('id') id: string, @Body() dto: any) {
+    return this.rolesService.update(+id, dto);
   }
 
   @Delete(':id')
+  @HttpCode(204)
   @RequirePermissions('role:delete')
   remove(@Param('id') id: string) {
     return this.rolesService.remove(+id);
   }
 
-  // Ma trận: lấy quyền đã tick của 1 role
   @Get(':id/permissions')
   @RequirePermissions('role:read')
   getPermissions(@Param('id') id: string) {
     return this.rolesService.getPermissions(+id);
   }
 
-  // Ma trận: lưu quyền đã tick của 1 role. Body: { "permissions": ["user:read", ...] }
+  // Chỉ đổi quyền, không đụng tên/mô tả. Body: { "permissions": [...] }
   @Put(':id/permissions')
   @RequirePermissions('role:update')
   updatePermissions(@Param('id') id: string, @Body() body: { permissions: string[] }) {

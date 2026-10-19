@@ -4,15 +4,16 @@ import { PermissionsGuard } from './permissions.guard.js';
 import { RequirePermissions } from './require-permissions.decorator.js';
 import { PermissionsService } from './permissions.service.js';
 
+
 @Controller('permissions')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class PermissionsController {
   constructor(private readonly permissionsService: PermissionsService) {}
 
-  // Trả về các hàng của ma trận (id, code, description, module)
+  // Danh mục quyền theo nhóm để frontend vẽ ma trận: [{ resource, label, permissions: [{ code, action, label }] }]
   @Get()
   @RequirePermissions('role:read')
   findAll() {
-    return this.permissionsService.findAll();
+    return this.permissionsService.findAllGrouped();
   }
 }

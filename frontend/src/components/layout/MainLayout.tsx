@@ -13,27 +13,28 @@ import { logout } from '../../features/auth/authSlice'
 import { usePermission } from '../../hooks/usePermission'
 import { appRoutes } from '../../routes/routeConfig'
 import { tokenStorage } from '../../utils/tokenStorage'
-import { authService } from '../../features/auth/authService' // Đảm bảo đường dẫn import service của bạn đúng
+import { authService } from '../../features/auth/authService'
 
 const { Header, Sider, Content } = Layout
 
 export default function MainLayout() {
-  const dispatch = useAppDispatch()
-  const navigate = useNavigate()
-  const location = useLocation()
-  const user = useAppSelector((state) => state.auth.user)
-  const { hasAny } = usePermission()
+  const dispatch = useAppDispatch() //gửi các hành động lên Redux store
+  const navigate = useNavigate() //điểu hướng trang
+  const location = useLocation() //URL
+  const user = useAppSelector((state) => state.auth.user) //lấy tt user
+  const { hasAny } = usePermission() // kiểm tra quyền hạn
 
-  const screens = Grid.useBreakpoint()
-  const isMobile = screens.lg === false
+  const screens = Grid.useBreakpoint() //grid của thư viện Ant
+  const isMobile = screens.lg === false 
 
-  const [collapsed, setCollapsed] = useState(false)
+  //Hook quản lý trạng thái hiển thị thanh điều hướng
+  const [collapsed, setCollapsed] = useState(false)  
   const [drawerOpen, setDrawerOpen] = useState(false)
 
   // Chỉ giữ các mục mà user có quyền
   const menuItems: MenuProps['items'] = appRoutes
-    .filter((r) => !r.permissions || hasAny(r.permissions))
-    .map((r) => ({ key: r.path, icon: r.icon, label: r.label }))
+    .filter((r) => !r.permissions || hasAny(r.permissions)) // sàng lọc trang mà tài khoản xem đc
+    .map((r) => ({ key: r.path, icon: r.icon, label: r.label })) // dịch lại path của router sang key
 
   const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
     navigate(key)
@@ -42,17 +43,12 @@ export default function MainLayout() {
 
   const handleLogout = async () => {
     try {
-      // Gọi API lên backend để xóa refreshToken trong CSDL
-      await authService.logout()
-    } catch (error) {
-      console.error('Lỗi khi đăng xuất ở backend:', error)
-    } finally {
-      // Dọn dẹp token ở client và chuyển về trang đăng nhập
-      tokenStorage.clear()
-      localStorage.removeItem('refreshToken')
-      dispatch(logout())
-      navigate('/login')
+      await authService.logout() // báo server thu hồi refresh token
+    } catch {
+      // lỗi mạng cũng không sao, vẫn đăng xuất phía trình duyệt
     }
+    tokenStorage.clear()
+    dispatch(logout())
   }
 
   const userMenu: MenuProps = {
@@ -62,7 +58,7 @@ export default function MainLayout() {
   }
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout style={{ minHeight: '100vh'  }}>
       {!isMobile && (
         <Sider trigger={null} collapsible collapsed={collapsed} theme="dark">
           <div
@@ -115,8 +111,8 @@ export default function MainLayout() {
           </Dropdown>
         </Header>
 
-        <Content style={{ margin: isMobile ? 8 : 16, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ background: '#fff', padding: isMobile ? 12 : 24, borderRadius: 8, minHeight: 360, width: '100%', flex: 1 }}>
+        <Content style={{ margin: isMobile ? 8 : 16 }}>
+          <div style={{ background: '#fff', padding: isMobile ? 12 : 24, borderRadius: 8, minHeight: 360 }}>
             <Outlet />
           </div>
         </Content>

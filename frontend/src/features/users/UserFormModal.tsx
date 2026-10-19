@@ -7,7 +7,7 @@ import { userService } from './userService'
 import type { UserFormValues, UserRecord } from './userTypes'
 
 interface Props {
-  user: UserRecord | null
+  user: UserRecord | null // null = thêm mới
   onClose: () => void
   onSaved: () => void
 }
@@ -15,55 +15,39 @@ interface Props {
 const ALL_ROLES: Role[] = ['ADMIN', 'STAFF', 'TEACHER', 'STUDENT']
 
 export default function UserFormModal({ user, onClose, onSaved }: Props) {
-  const me = useAppSelector((state) => state.auth.user)
-  const [form] = Form.useForm<UserFormValues>()
-  const [saving, setSaving] = useState(false)
+  const me = useAppSelector((state) => state.auth.user) // thông tin user đang đăng nhập
+  const [form] = Form.useForm<UserFormValues>() //form quản lý biểu mẫu
+  const [saving, setSaving] = useState(false) // trạng thái lưu
 
   const isEdit = user !== null
   const isSelf = user !== null && me?.id === user.id
 
+  // Staff không được chọn vai trò Admin
   const roleOptions = ALL_ROLES.filter((r) => me?.role === 'ADMIN' || r !== 'ADMIN').map((r) => ({
     value: r,
     label: r,
   }))
 
-  const getRoleId = (roleName: string): number => {
-    switch (roleName) {
-      case 'ADMIN': return 1;
-      case 'STAFF': return 2;
-      case 'TEACHER': return 3;
-      case 'STUDENT': return 4;
-      default: return 4;
-    }
-  }
-
   const handleOk = async () => {
-    let values: UserFormValues
+    let values: UserFormValues // hứng data user bằng biến values
     try {
-      values = await form.validateFields()
+      values = await form.validateFields() // kiểm tra lỗi định dạng
     } catch {
-      return
+      return // còn ô chưa hợp lệ, Ant Design đã hiện lỗi
     }
 
-    setSaving(true)
+    setSaving(true) //hiệu ứng lưu
     try {
-      const roleName = values.role || 'STUDENT'
-      const roleId = getRoleId(roleName)
-
-      if (user) {
+      if (user) { // nếu user tồn tại, gọi hàm update từ userService
         await userService.update(user.id, {
           fullName: values.fullName,
           phone: values.phone,
-          role: roleName,
-          roleId: roleId,
+          role: values.role,
           isActive: values.isActive,
         })
         message.success('Đã cập nhật người dùng')
       } else {
-        await userService.create({
-          ...values,
-          roleId: roleId,
-        })
+        await userService.create(values)
         message.success('Đã thêm người dùng')
       }
       onSaved()

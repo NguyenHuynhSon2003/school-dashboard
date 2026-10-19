@@ -1,91 +1,95 @@
 import axios from 'axios'
+import type { InternalAxiosRequestConfig } from 'axios'
 import { tokenStorage } from '../utils/tokenStorage'
+import { refreshTokenStorage } from '../utils/refreshTokenStorage'
+import type { User } from '../features/auth/authSlice'
 
-const axiosClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api/v1',
-  headers: {
-    'Content-Type': 'application/json',
-  },
+const BASE_URL = '/api/v1'
+
+const axiosClient = axios.create({// liên kết URL gốc với các tên miền khác nhau
+  baseURL: BASE_URL,
+  headers: { 'Content-Type': 'application/json' },
+  withCredentials: true, // để trình duyệt gửi kèm cookie refresh token
 })
 
-// Tự gắn Access Token vào mọi request
-axiosClient.interceptors.request.use(
-  (config) => {
-    const token = tokenStorage.get()
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error) => Promise.reject(error),
-)
+// Client riêng, không có interceptor, chỉ dùng để gọi refresh (tránh lặp vô hạn)
+const refreshClient = axios.create({ baseURL: BASE_URL, withCredentials: true })
 
-// Biến cờ và hàng đợi để xử lý refresh token đồng thời
-let isRefreshing = false
-let failedQueue: Array<{
-  resolve: (token: string) => void
-  reject: (err: unknown) => void
-}> = []
-
-const processQueue = (error: unknown, token: null | string = null) => {
-  failedQueue.forEach((prom) => {
-    if (error) {
-      prom.reject(error)
-    } else {
-      prom.resolve(token!)
-    }
-  })
-  failedQueue = []
+// Nơi khởi động đăng ký hàm này để báo cho Redux khi phiên hết hẳn
+let onAuthFailure: () => void = () => {}
+export function setAuthFailureHandler(handler: () => void) {
+  onAuthFailure = handler
 }
 
-// Bắt lỗi 401 để tự động gọi refresh token
+// Kết quả của /auth/refresh. Backend mới trả kèm user, backend cũ thì không có
+export interface RefreshResult {
+  accessToken: string
+  expiresIn?: number
+  user?: User
+}
+
+// Promise dùng chung: nhiều request cùng cần refresh thì chỉ gọi API một lần
+let refreshPromise: Promise<RefreshResult> | null = null
+
+// lấy accessToken mới từ refreshToken
+export function refreshAccessToken(): Promise<RefreshResult> {
+  if (!refreshPromise) {
+    refreshPromise = refreshClient
+      .post<RefreshResult>('/auth/refresh', {
+        refreshToken: refreshTokenStorage.get(),
+      })
+      .then((res) => {
+        tokenStorage.set(res.data.accessToken)
+        return res.data
+      })
+      .finally(() => {
+        refreshPromise = null
+      })
+  }
+  return refreshPromise
+}
+
+// Tự gắn token vào mọi request nếu đang có token
+axiosClient.interceptors.request.use((config) => {
+  const token = tokenStorage.get() // lấy token hiện tại
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean }
+
+// Gặp 401: refresh một lần rồi gọi lại request ban đầu
 axiosClient.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const originalRequest = error.config
+  async (error: unknown) => {
+    if (!axios.isAxiosError(error) || !error.config) return Promise.reject(error)
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject })
-        })
-          .then((token) => {
-            originalRequest.headers.Authorization = `Bearer ${token}`
-            return axiosClient(originalRequest)
-          })
-          .catch((err) => Promise.reject(err))
-      }
+    const original = error.config as RetriableConfig
+    const url = original.url ?? ''
+    // Đăng nhập sai (401) hoặc đăng xuất thì không refresh
+    const skip = url.includes('/auth/login') || url.includes('/auth/logout')
 
-      originalRequest._retry = true
-      isRefreshing = true
-
-      try {
-        const refreshToken = localStorage.getItem('refreshToken')
-        const response = await axios.post(
-          `${axiosClient.defaults.baseURL}/auth/refresh`,
-          { refreshToken }
-        )
-
-        const { accessToken } = response.data
-        tokenStorage.set(accessToken) // Lưu access token mới
-
-        axiosClient.defaults.headers.common.Authorization = `Bearer ${accessToken}`
-        processQueue(null, accessToken)
-
-        originalRequest.headers.Authorization = `Bearer ${accessToken}`
-        return axiosClient(originalRequest)
-      } catch (refreshError) {
-        processQueue(refreshError, null)
-        tokenStorage.clear()
-        localStorage.removeItem('refreshToken')
-        window.location.href = '/login'
-        return Promise.reject(refreshError)
-      } finally {
-        isRefreshing = false
-      }
+    if (error.response?.status !== 401 || original._retry || skip) {
+      return Promise.reject(error)
     }
 
-    return Promise.reject(error)
+    original._retry = true
+
+    let newToken: string
+    try {
+      newToken = (await refreshAccessToken()).accessToken
+    } catch {
+      // Refresh thất bại: phiên đã hết hẳn. Chỉ báo một lần dù nhiều request cùng lỗi
+      const hadToken = tokenStorage.get() !== null
+      tokenStorage.clear()
+      if (hadToken) onAuthFailure()
+      return Promise.reject(error)
+    }
+
+    original.headers.set('Authorization', `Bearer ${newToken}`)
+    return axiosClient(original)
   },
 )
 

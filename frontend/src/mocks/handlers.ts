@@ -1,18 +1,80 @@
 import { delay, http, HttpResponse } from 'msw'
 import type { Role } from '../features/auth/authSlice'
 
-const PERMISSIONS: Record<Role, string[]> = {
-  ADMIN: [
-    'user:read', 'user:create', 'user:update', 'user:delete',
-    'role:read',
-    'timetable:read', 'timetable:manage',
-  ],
-  STAFF: [
-    'user:read', 'user:create', 'user:update',
-    'timetable:read', 'timetable:manage',
-  ],
-  TEACHER: ['timetable:read_own'],
-  STUDENT: ['timetable:read_own'],
+interface MockRole {
+  id: number
+  name: string
+  description: string
+  permissions: string[]
+}
+
+const roles: MockRole[] = [
+  {
+    id: 1,
+    name: 'ADMIN',
+    description: 'Quản trị viên hệ thống, có toàn quyền quản trị và quản lý người dùng.',
+    permissions: [
+      'user:read', 'user:create', 'user:update', 'user:delete',
+      'role:read', 'role:create', 'role:update', 'role:delete',
+      'timetable:read', 'timetable:manage',
+    ],
+  },
+  {
+    id: 2,
+    name: 'STAFF',
+    description: 'Giáo vụ, quản lý tài khoản người dùng và điều phối thời khóa biểu.',
+    permissions: ['user:read', 'user:create', 'user:update', 'timetable:read', 'timetable:manage'],
+  },
+  {
+    id: 3,
+    name: 'TEACHER',
+    description: 'Giáo viên bộ môn, theo dõi lịch giảng dạy cá nhân.',
+    permissions: ['timetable:read_own'],
+  },
+  {
+    id: 4,
+    name: 'STUDENT',
+    description: 'Học sinh, theo dõi lịch học tập cá nhân.',
+    permissions: ['timetable:read_own'],
+  },
+]
+
+// Danh mục quyền (giống bảng permissions ở backend): dùng để vẽ ma trận
+const PERMISSION_GROUPS = [
+  {
+    resource: 'user',
+    label: 'Người dùng',
+    permissions: [
+      { code: 'user:read', action: 'read', label: 'Xem danh sách người dùng' },
+      { code: 'user:create', action: 'create', label: 'Thêm người dùng' },
+      { code: 'user:update', action: 'update', label: 'Sửa người dùng' },
+      { code: 'user:delete', action: 'delete', label: 'Xóa người dùng' },
+    ],
+  },
+  {
+    resource: 'role',
+    label: 'Vai trò',
+    permissions: [
+      { code: 'role:read', action: 'read', label: 'Xem vai trò' },
+      { code: 'role:create', action: 'create', label: 'Thêm vai trò' },
+      { code: 'role:update', action: 'update', label: 'Sửa vai trò và quyền' },
+      { code: 'role:delete', action: 'delete', label: 'Xóa vai trò' },
+    ],
+  },
+  {
+    resource: 'timetable',
+    label: 'Thời khóa biểu',
+    permissions: [
+      { code: 'timetable:read', action: 'read', label: 'Xem thời khóa biểu của mọi người' },
+      { code: 'timetable:read_own', action: 'read_own', label: 'Chỉ xem thời khóa biểu của mình' },
+      { code: 'timetable:manage', action: 'manage', label: 'Quản lý thời khóa biểu' },
+    ],
+  },
+]
+const ALL_PERMISSION_CODES = PERMISSION_GROUPS.flatMap((g) => g.permissions.map((p) => p.code))
+
+function permissionsOf(roleName: string) {
+  return roles.find((r) => r.name === roleName)?.permissions ?? []
 }
 
 interface MockUser {
@@ -66,15 +128,49 @@ function toListItem(u: MockUser) {
 }
 
 function toPublicUser(u: MockUser) {
-  return { ...toListItem(u), permissions: PERMISSIONS[u.role] }
+  return { ...toListItem(u), permissions: permissionsOf(u.role) }
 }
 
 function errorResponse(status: number, code: string, message: string) {
   return HttpResponse.json({ status, code, message }, { status })
 }
 
+interface RoleBody {
+  name: string
+  description?: string
+  permissions: string[]
+}
+
+function toRoleItem(r: MockRole) {
+  return { ...r, userCount: users.filter((u) => u.role === r.name).length }
+}
+
+// Gộp bước "đã đăng nhập chưa" và "có quyền chưa" vào một hàm
+function guard(request: Request, code: string) {
+  const me = getCurrentUser(request)
+  if (!me) return { error: unauthorized(request) }
+  if (!permissionsOf(me.role).includes(code)) {
+    return { error: errorResponse(403, 'FORBIDDEN', 'Bạn không có quyền thực hiện thao tác này') }
+  }
+  return { me }
+}
+
+function validateRole(body: RoleBody, selfId?: number) {
+  const name = (body.name ?? '').trim().toUpperCase()
+  if (!/^[A-Z][A-Z0-9_]{1,29}$/.test(name)) {
+    return errorResponse(422, 'VALIDATION_ERROR', 'Tên vai trò gồm 2-30 ký tự: chữ in hoa, số hoặc dấu _')
+  }
+  if (roles.some((r) => r.name === name && r.id !== selfId)) {
+    return errorResponse(409, 'CONFLICT', 'Tên vai trò đã tồn tại')
+  }
+  if (!Array.isArray(body.permissions) || body.permissions.some((p) => !ALL_PERMISSION_CODES.includes(p))) {
+    return errorResponse(422, 'VALIDATION_ERROR', 'Danh sách quyền không hợp lệ')
+  }
+  return null
+}
+
 // ===== Token và phiên đăng nhập (mock) =====
-const ACCESS_TTL_SECONDS = 60 // dev: 60 giây để thử hết hạn; giống thật thì đổi thành 900 (15 phút)
+const ACCESS_TTL_SECONDS = 900 // dev: 60 giây để thử hết hạn; giống thật thì đổi thành 900 (15 phút)
 const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 ngày
 const REFRESH_KEY = 'mockRefreshSession'
 
@@ -211,6 +307,7 @@ export const handlers = [
 
     return HttpResponse.json({
       accessToken: makeAccessToken(user.id),
+      refreshToken: `mock-refresh-${user.id}`, // giả lập backend thật trả refresh token trong body
       expiresIn: ACCESS_TTL_SECONDS,
       user: toPublicUser(user),
     })
@@ -234,6 +331,7 @@ export const handlers = [
     return HttpResponse.json({
       accessToken: makeAccessToken(user.id),
       expiresIn: ACCESS_TTL_SECONDS,
+      user: toPublicUser(user),
     })
   }),
 
@@ -253,7 +351,7 @@ export const handlers = [
 
     const me = getCurrentUser(request)
     if (!me) return unauthorized(request)
-    if (!PERMISSIONS[me.role].includes('user:read')) {
+    if (!permissionsOf(me.role).includes('user:read')) {
       return errorResponse(403, 'FORBIDDEN', 'Bạn không có quyền thực hiện thao tác này')
     }
 
@@ -285,7 +383,7 @@ export const handlers = [
 
     const me = getCurrentUser(request)
     if (!me) return unauthorized(request)
-    if (!PERMISSIONS[me.role].includes('user:delete')) {
+    if (!permissionsOf(me.role).includes('user:delete')) {
       return errorResponse(403, 'FORBIDDEN', 'Bạn không có quyền thực hiện thao tác này')
     }
 
@@ -303,7 +401,7 @@ export const handlers = [
 
     const me = getCurrentUser(request)
     if (!me) return unauthorized(request)
-    if (!PERMISSIONS[me.role].includes('user:create')) {
+    if (!permissionsOf(me.role).includes('user:create')) {
       return errorResponse(403, 'FORBIDDEN', 'Bạn không có quyền thực hiện thao tác này')
     }
 
@@ -351,7 +449,7 @@ export const handlers = [
 
     const me = getCurrentUser(request)
     if (!me) return unauthorized(request)
-    if (!PERMISSIONS[me.role].includes('user:update')) {
+    if (!permissionsOf(me.role).includes('user:update')) {
       return errorResponse(403, 'FORBIDDEN', 'Bạn không có quyền thực hiện thao tác này')
     }
 
@@ -381,27 +479,88 @@ export const handlers = [
 
   http.get('/api/v1/roles', async ({ request }) => {
     await delay(300)
+    const g = guard(request, 'role:read')
+    if ('error' in g) return g.error
+    return HttpResponse.json(roles.map(toRoleItem))
+  }),
 
-    const me = getCurrentUser(request)
-    if (!me) return unauthorized(request)
-    if (!PERMISSIONS[me.role].includes('role:read')) {
-      return errorResponse(403, 'FORBIDDEN', 'Bạn không có quyền thực hiện thao tác này')
+  http.get('/api/v1/permissions', async ({ request }) => {
+    await delay(200)
+    const g = guard(request, 'role:read')
+    if ('error' in g) return g.error
+    return HttpResponse.json(PERMISSION_GROUPS)
+  }),
+
+  http.post('/api/v1/roles', async ({ request }) => {
+    await delay(300)
+    const g = guard(request, 'role:create')
+    if ('error' in g) return g.error
+
+    const body = (await request.json()) as RoleBody
+    const invalid = validateRole(body)
+    if (invalid) return invalid
+
+    const role: MockRole = {
+      id: Math.max(...roles.map((r) => r.id)) + 1,
+      name: body.name.trim().toUpperCase(),
+      description: body.description?.trim() ?? '',
+      permissions: body.permissions,
+    }
+    roles.push(role)
+    return HttpResponse.json(toRoleItem(role), { status: 201 })
+  }),
+
+  http.patch('/api/v1/roles/:id', async ({ request, params }) => {
+    await delay(300)
+    const g = guard(request, 'role:update')
+    if ('error' in g) return g.error
+
+    const role = roles.find((r) => r.id === Number(params.id))
+    if (!role) return errorResponse(404, 'NOT_FOUND', 'Không tìm thấy vai trò')
+
+    const body = (await request.json()) as RoleBody
+    const invalid = validateRole(body, role.id)
+    if (invalid) return invalid
+
+    const newName = body.name.trim().toUpperCase()
+    if (role.name === 'ADMIN') {
+      // Chặn tự khóa mình ra khỏi hệ thống
+      if (newName !== 'ADMIN') {
+        return errorResponse(403, 'FORBIDDEN', 'Không thể đổi tên vai trò ADMIN')
+      }
+      if (!body.permissions.includes('role:read') || !body.permissions.includes('role:update')) {
+        return errorResponse(403, 'FORBIDDEN', 'ADMIN phải luôn giữ quyền xem và sửa vai trò')
+      }
     }
 
-    const rolesData = [
-      { id: 1, name: 'ADMIN', description: 'Quản trị viên hệ thống, có toàn quyền quản trị và quản lý người dùng.' },
-      { id: 2, name: 'STAFF', description: 'Giáo vụ, quản lý tài khoản người dùng và điều phối thời khóa biểu.' },
-      { id: 3, name: 'TEACHER', description: 'Giáo viên bộ môn, theo dõi lịch giảng dạy cá nhân.' },
-      { id: 4, name: 'STUDENT', description: 'Học sinh, theo dõi lịch học tập cá nhân.' },
-    ]
+    // Người dùng lưu vai trò bằng tên, nên đổi tên vai trò thì cập nhật theo
+    users.forEach((u) => {
+      if (u.role === role.name) u.role = newName
+    })
+    role.name = newName
+    role.description = body.description?.trim() ?? ''
+    role.permissions = body.permissions
+    return HttpResponse.json(toRoleItem(role))
+  }),
 
-    const result = rolesData.map((r) => ({
-      ...r,
-      permissions: PERMISSIONS[r.name as Role],
-      userCount: users.filter((u) => u.role === r.name).length,
-    }))
+  http.delete('/api/v1/roles/:id', async ({ request, params }) => {
+    await delay(300)
+    const g = guard(request, 'role:delete')
+    if ('error' in g) return g.error
 
-    return HttpResponse.json(result)
+    const index = roles.findIndex((r) => r.id === Number(params.id))
+    if (index === -1) return errorResponse(404, 'NOT_FOUND', 'Không tìm thấy vai trò')
+
+    const role = roles[index]
+    if (role.name === 'ADMIN') return errorResponse(403, 'FORBIDDEN', 'Không thể xóa vai trò ADMIN')
+
+    const count = users.filter((u) => u.role === role.name).length
+    if (count > 0) {
+      return errorResponse(409, 'CONFLICT', `Vai trò đang có ${count} người dùng, hãy chuyển họ sang vai trò khác trước`)
+    }
+
+    roles.splice(index, 1)
+    return new HttpResponse(null, { status: 204 })
   }),
 
     http.get('/api/v1/timetable/people', async ({ request }) => {
@@ -409,7 +568,7 @@ export const handlers = [
 
     const me = getCurrentUser(request)
     if (!me) return unauthorized(request)
-    if (!PERMISSIONS[me.role].includes('timetable:read')) {
+    if (!permissionsOf(me.role).includes('timetable:read')) {
       return errorResponse(403, 'FORBIDDEN', 'Bạn không có quyền thực hiện thao tác này')
     }
 
@@ -425,8 +584,8 @@ export const handlers = [
     const me = getCurrentUser(request)
     if (!me) return unauthorized(request)
 
-    const canReadAll = PERMISSIONS[me.role].includes('timetable:read')
-    const canReadOwn = PERMISSIONS[me.role].includes('timetable:read_own')
+    const canReadAll = permissionsOf(me.role).includes('timetable:read')
+    const canReadOwn = permissionsOf(me.role).includes('timetable:read_own')
     if (!canReadAll && !canReadOwn) {
       return errorResponse(403, 'FORBIDDEN', 'Bạn không có quyền thực hiện thao tác này')
     }

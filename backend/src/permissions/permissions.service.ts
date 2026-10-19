@@ -4,6 +4,18 @@ import { In, Repository } from 'typeorm';
 import { Permission } from './permission.entity.js';
 import { Role } from '../roles/entities/role.entity.js';
 
+const RESOURCE_LABELS: Record<string, string> = {
+  user: 'Người dùng',
+  role: 'Vai trò',
+  timetable: 'Thời khóa biểu',
+};
+
+export interface PermissionGroupDto {
+  resource: string;
+  label: string;
+  permissions: { code: string; action: string; label: string }[];
+}
+
 // Quyền tối thiểu phải luôn còn ở ít nhất 1 role, tránh tự khóa hệ thống
 const MANAGE_ROLE_PERMISSION = 'role:update';
 
@@ -16,6 +28,23 @@ export class PermissionsService {
 
   findAll(): Promise<Permission[]> {
     return this.permRepo.find({ order: { module: 'ASC', id: 'ASC' } });
+  }
+
+  /** Dạng frontend dùng để vẽ ma trận: mỗi nhóm (user, role, timetable) là một hàng. */
+  async findAllGrouped(): Promise<PermissionGroupDto[]> {
+    const all = await this.permRepo.find({ order: { id: 'ASC' } });
+    const groups = new Map<string, PermissionGroupDto>();
+    for (const p of all) {
+      if (!groups.has(p.module)) {
+        groups.set(p.module, { resource: p.module, label: RESOURCE_LABELS[p.module] ?? p.module, permissions: [] });
+      }
+      groups.get(p.module)!.permissions.push({
+        code: p.code,
+        action: p.code.split(':')[1] ?? p.code, // 'user:read' -> 'read' (tiêu đề cột)
+        label: p.description ?? p.code,
+      });
+    }
+    return [...groups.values()];
   }
 
   async getCodesByRoleName(roleName?: string | null): Promise<string[]> {

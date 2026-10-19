@@ -1,8 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {  BadRequestException, ConflictException, ForbiddenException,Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Role } from './entities/role.entity.js';
 import { PermissionsService } from '../permissions/permissions.service.js';
+
+
+const NAME_PATTERN = /^[A-Z][A-Z0-9_]{1,29}$/;
+const ADMIN_ROLE = 'ADMIN';
+const ADMIN_REQUIRED = ['role:read', 'role:update'];
 
 @Injectable()
 export class RolesService {
@@ -12,23 +17,59 @@ export class RolesService {
     private permissionsService: PermissionsService,
   ) {}
 
-  // Khi thêm role mới có thể chọn luôn quyền: { name, description, permissions: ["user:read", ...] }
-  async create(createRoleDto: any): Promise<any> {
-    const { permissions, ...roleData } = createRoleDto ?? {};
-    const saved = await this.roleRepository.save(this.roleRepository.create(roleData as Partial<Role>));
-    const role = Array.isArray(saved) ? saved[0] : saved;
+  private toItem(role: Role) {
+    return {
+      id: role.id,
+      name: role.name,
+      description: role.description ?? '',
+      permissions: (role.permissions ?? []).map((p) => p.code),
+      userCount: role.users ? role.users.length : 0,
+    };
+  }
 
-    let granted: string[] = [];
-    if (Array.isArray(permissions) && permissions.length > 0) {
+  private async findItem(id: number) {
+    const role = await this.roleRepository.findOne({
+      where: { id },
+      relations: { users: true, permissions: true } as any,
+    });
+    if (!role) throw new NotFoundException('Không tìm thấy vai trò');
+    return this.toItem(role);
+  }
+
+  private normalizeName(raw: unknown): string {
+    const name = String(raw ?? '').trim().toUpperCase();
+    if (!NAME_PATTERN.test(name)) {
+      throw new BadRequestException('Tên vai trò gồm 2-30 ký tự: chữ, số hoặc dấu _ (bắt đầu bằng chữ)');
+    }
+    return name;
+  }
+
+  private async assertNameFree(name: string, exceptId?: number) {
+    const existing = await this.roleRepository.findOne({ where: { name } });
+    if (existing && existing.id !== exceptId) {
+      throw new ConflictException('Tên vai trò đã tồn tại');
+    }
+  }
+
+  // Thêm vai trò kèm quyền: { name, description, permissions: ["user:read", ...] }
+  async create(dto: any) {
+    const name = this.normalizeName(dto?.name);
+    await this.assertNameFree(name);
+
+    const saved = await this.roleRepository.save(
+      this.roleRepository.create({ name, description: String(dto?.description ?? '').trim() }),
+    );
+
+    if (Array.isArray(dto?.permissions) && dto.permissions.length > 0) {
       try {
-        granted = await this.permissionsService.setRolePermissions(role.id, permissions);
+        await this.permissionsService.setRolePermissions(saved.id, dto.permissions);
       } catch (err) {
-        // Mã quyền sai thì không để lại role "mồ côi"
-        await this.roleRepository.delete(role.id);
+        // Mã quyền sai thì không để lại vai trò "mồ côi"
+        await this.roleRepository.delete(saved.id);
         throw err;
       }
     }
-    return { id: role.id, name: role.name, description: role.description, permissions: granted };
+    return this.findItem(saved.id);
   }
 
   async findAll(): Promise<any[]> {
@@ -36,13 +77,7 @@ export class RolesService {
       relations: { users: true, permissions: true } as any,
       order: { id: 'ASC' },
     });
-    return roles.map((role) => ({
-      id: role.id,
-      name: role.name,
-      description: role.description,
-      permissions: (role.permissions ?? []).map((p) => p.code),
-      userCount: role.users ? role.users.length : 0,
-    }));
+    return roles.map((role) => this.toItem(role));
   }
 
   async findOne(id: number): Promise<Role> {
@@ -51,18 +86,46 @@ export class RolesService {
     return role;
   }
 
-  async update(id: number, updateRoleDto: any): Promise<Role> {
-    // Chỉ cho sửa name/description; quyền sửa qua updatePermissions
-    const { name, description } = updateRoleDto ?? {};
-    await this.roleRepository.update(id, { name, description });
-    return this.findOne(id);
+  // Sửa tên, mô tả và quyền trong một lần (PATCH /roles/:id)
+  async update(id: number, dto: any) {
+    const role = await this.roleRepository.findOne({ where: { id } });
+    if (!role) throw new NotFoundException('Không tìm thấy vai trò');
+
+    const isAdmin = role.name.toUpperCase() === ADMIN_ROLE;
+    const newName = dto?.name === undefined ? role.name : this.normalizeName(dto.name);
+    const permissions: string[] | undefined = Array.isArray(dto?.permissions) ? dto.permissions : undefined;
+
+    if (isAdmin) {
+      if (newName !== ADMIN_ROLE) {
+        throw new ForbiddenException('Không thể đổi tên vai trò ADMIN');
+      }
+      if (permissions && !ADMIN_REQUIRED.every((c) => permissions.includes(c))) {
+        throw new ForbiddenException('ADMIN phải luôn giữ quyền xem và sửa vai trò');
+      }
+    }
+    if (newName !== role.name) await this.assertNameFree(newName, id);
+
+    // Quyền trước (có thể bị từ chối), rồi mới đổi tên/mô tả để không bị cập nhật dở dang
+    if (permissions) await this.permissionsService.setRolePermissions(id, permissions);
+
+    const patch: Partial<Role> = { name: newName };
+    if (dto?.description !== undefined) patch.description = String(dto.description).trim();
+    await this.roleRepository.update(id, patch);
+
+    return this.findItem(id);
   }
 
   async remove(id: number): Promise<void> {
-    const result = await this.roleRepository.delete(id);
-    if (result.affected === 0) {
-      throw new NotFoundException(`Role with ID ${id} not found`);
+    const role = await this.roleRepository.findOne({ where: { id }, relations: { users: true } as any });
+    if (!role) throw new NotFoundException('Không tìm thấy vai trò');
+    if (role.name.toUpperCase() === ADMIN_ROLE) {
+      throw new ForbiddenException('Không thể xóa vai trò ADMIN');
     }
+    const count = role.users?.length ?? 0;
+    if (count > 0) {
+      throw new ConflictException(`Vai trò đang có ${count} người dùng, hãy chuyển họ sang vai trò khác trước`);
+    }
+    await this.roleRepository.delete(id);
   }
 
   async getPermissions(id: number): Promise<string[]> {

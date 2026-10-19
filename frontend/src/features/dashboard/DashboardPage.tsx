@@ -7,8 +7,9 @@ import { PERMISSIONS } from '../../utils/constants'
 import { timetableService } from '../timetable/timetableService'
 import type { TimetableResponse } from '../timetable/timetableTypes'
 import { userService } from '../users/userService'
-import type { UserListParams } from '../users/userTypes'
 
+
+// khai báo ngày giờ thực tế
 const TODAY_TEXT = new Date().toLocaleDateString('vi-VN', {
   weekday: 'long',
   day: '2-digit',
@@ -16,7 +17,7 @@ const TODAY_TEXT = new Date().toLocaleDateString('vi-VN', {
   year: 'numeric',
 })
 
-interface Stats {
+interface Stats { // dữ liệu hiển thị ở trang tổng quan
   total: number
   students: number
   teachers: number
@@ -25,22 +26,15 @@ interface Stats {
 
 // ===== Admin và Staff: thẻ thống kê =====
 function AdminStats() {
-  // undefined = đang tải, null = lỗi
   const [stats, setStats] = useState<Stats | null | undefined>(undefined)
 
   useEffect(() => {
     let ignore = false
-    const count = (extra: Partial<UserListParams>) =>
-      userService.list({ page: 1, pageSize: 1, ...extra }).then((res) => res.total)
 
-    Promise.all([
-      count({}),
-      count({ role: 'STUDENT' }),
-      count({ role: 'TEACHER' }),
-      count({ isActive: false }),
-    ])
-      .then(([total, students, teachers, locked]) => {
-        if (!ignore) setStats({ total, students, teachers, locked })
+    // Gọi ĐÚNG 1 request duy nhất tới endpoint /users/stats đã có sẵn ở backend
+    userService.getStats()
+      .then((data) => {
+        if (!ignore) setStats(data)
       })
       .catch(() => {
         if (ignore) return

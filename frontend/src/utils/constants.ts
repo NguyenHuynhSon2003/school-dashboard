@@ -8,6 +8,8 @@ export const PERMISSIONS = {
   USER_DELETE: 'user:delete',
   ROLE_READ: 'role:read',
   ROLE_UPDATE: 'role:update',
+  ROLE_CREATE: 'role:create',
+  ROLE_DELETE: 'role:delete',
   TIMETABLE_READ: 'timetable:read',
   TIMETABLE_READ_OWN: 'timetable:read_own',
   TIMETABLE_MANAGE: 'timetable:manage',

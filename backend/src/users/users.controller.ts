@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Query, Request, ForbiddenException,
+  Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Query, Request, ForbiddenException,DefaultValuePipe, ParseIntPipe,
 } from '@nestjs/common';
 import { UsersService } from './users.service.js';
 import { JwtAuthGuard } from '../auth/jwt-auth/jwt-auth.guard.js';
@@ -20,28 +20,27 @@ export class UsersController {
   }
 
   @Get()
-  @RequirePermissions('user:read')
-  findAll(
-    @Query('page') page: number = 1,
-    @Query('pageSize') pageSize: number = 10,
-    @Query('search') search?: string,
-    @Query('role') role?: string,
-    @Query('isActive') isActive?: string,
-  ) {
-    // Chuyển đổi 'active'/'locked' hoặc 'true'/'false' từ query string sang kiểu boolean (nếu có)
-    let activeBoolean: boolean | undefined = undefined;
-    if (isActive !== undefined) {
-      activeBoolean = isActive === 'true' || isActive === 'active';
-    }
-
-    return this.usersService.findAllPaginated(
-      Number(page),
-      Number(pageSize),
-      search,
-      role,
-      activeBoolean,
-    );
+@RequirePermissions('user:read')
+findAll(
+  @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+  @Query('pageSize', new DefaultValuePipe(10), ParseIntPipe) pageSize: number,
+  @Query('search') search?: string,
+  @Query('role') role?: string,
+  @Query('isActive') isActive?: string,
+) {
+  let activeBoolean: boolean | undefined = undefined;
+  if (isActive !== undefined) {
+    activeBoolean = isActive === 'true' || isActive === 'active';
   }
+
+  return this.usersService.findAllPaginated(
+    page,         
+    pageSize,      
+    search,
+    role,
+    activeBoolean,
+  );
+}
 
   // Số liệu cho Dashboard. PHẢI đặt trước @Get(':id'), nếu không 'stats' bị hiểu là id
   @Get('stats')
