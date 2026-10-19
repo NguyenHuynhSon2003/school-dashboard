@@ -18,6 +18,10 @@ export interface PermissionGroupDto {
 
 // Quyền tối thiểu phải luôn còn ở ít nhất 1 role, tránh tự khóa hệ thống
 const MANAGE_ROLE_PERMISSION = 'role:update';
+const IMPLIES: Record<string, string[]> = {
+  'timetable:read': ['timetable:read_own'],
+  'timetable:manage': ['timetable:read', 'timetable:read_own'],
+};
 
 @Injectable()
 export class PermissionsService {
@@ -107,10 +111,17 @@ export class PermissionsService {
     return perms.map((p) => p.code);
   }
 
+  private expand(perms: string[]): Set<string> {
+    const out = new Set(perms);
+    for (const p of perms) (IMPLIES[p] ?? []).forEach((q) => out.add(q));
+    return out;
+  }
+
   /** Chặn leo thang đặc quyền: chỉ thao tác/gán được role có quyền nằm trong tập quyền của mình. */
   async assertCanAssignRole(currentPermissions: string[], roleId: number): Promise<void> {
+    const mine = this.expand(currentPermissions);
     const targetCodes = await this.getCodesByRoleId(roleId);
-    if (targetCodes.some((c) => !currentPermissions.includes(c))) {
+    if (targetCodes.some((c) => !mine.has(c))) {
       throw new ForbiddenException('Bạn không có quyền thao tác với tài khoản hoặc role có quyền cao hơn mình');
     }
   }
