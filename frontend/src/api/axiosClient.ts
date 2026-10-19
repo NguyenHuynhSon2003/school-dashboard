@@ -2,6 +2,7 @@ import axios from 'axios'
 import type { InternalAxiosRequestConfig } from 'axios'
 import { tokenStorage } from '../utils/tokenStorage'
 import { refreshTokenStorage } from '../utils/refreshTokenStorage'
+import type { User } from '../features/auth/authSlice'
 
 const BASE_URL = '/api/v1'
 
@@ -20,22 +21,29 @@ export function setAuthFailureHandler(handler: () => void) {
   onAuthFailure = handler
 }
 
+// Kết quả của /auth/refresh. Backend mới trả kèm user, backend cũ thì không có
+export interface RefreshResult {
+  accessToken: string
+  expiresIn?: number
+  user?: User
+}
+
 // Promise dùng chung: nhiều request cùng cần refresh thì chỉ gọi API một lần
-let refreshPromise: Promise<string> | null = null
+let refreshPromise: Promise<RefreshResult> | null = null
 
 // lấy accessToken mới từ refreshToken
-export function refreshAccessToken(): Promise<string> { // hàm trả về chuỗi token
-  if (!refreshPromise) { // kiểm tra có request refresh nào chạy ko
+export function refreshAccessToken(): Promise<RefreshResult> {
+  if (!refreshPromise) {
     refreshPromise = refreshClient
-     .post<{ accessToken: string; expiresIn?: number }>('/auth/refresh', {
-       refreshToken: refreshTokenStorage.get(), // lấy refresh token đang lưu trong LocalStorage gửi lên server
-     })
-      .then((res) => { //xử lý thành công
-        tokenStorage.set(res.data.accessToken) // lưu token vào storage
-        return res.data.accessToken // trả chuỗi token ra để giải quyết promise
+      .post<RefreshResult>('/auth/refresh', {
+        refreshToken: refreshTokenStorage.get(),
+      })
+      .then((res) => {
+        tokenStorage.set(res.data.accessToken)
+        return res.data
       })
       .finally(() => {
-        refreshPromise = null // đưa về trạng thái ban đầu và đợi token hết hạn lần nữa
+        refreshPromise = null
       })
   }
   return refreshPromise
@@ -71,7 +79,7 @@ axiosClient.interceptors.response.use(
 
     let newToken: string
     try {
-      newToken = await refreshAccessToken()
+      newToken = (await refreshAccessToken()).accessToken
     } catch {
       // Refresh thất bại: phiên đã hết hẳn. Chỉ báo một lần dù nhiều request cùng lỗi
       const hadToken = tokenStorage.get() !== null

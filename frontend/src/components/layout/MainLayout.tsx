@@ -21,8 +21,8 @@ export default function MainLayout() {
   const dispatch = useAppDispatch() //gửi các hành động lên Redux store
   const navigate = useNavigate() //điểu hướng trang
   const location = useLocation() //URL
-  const user = useAppSelector((state) => state.auth.user) //lấy tt user đẽ hiển thị trên navigate
-  const { hasAny } = usePermission() // kiểm tra quyền hạn chi tiết
+  const user = useAppSelector((state) => state.auth.user) //lấy tt user
+  const { hasAny } = usePermission() // kiểm tra quyền hạn
 
   const screens = Grid.useBreakpoint() //grid của thư viện Ant
   const isMobile = screens.lg === false 

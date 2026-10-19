@@ -3,8 +3,9 @@ import type { PayloadAction } from '@reduxjs/toolkit'
 import { refreshAccessToken } from '../../api/axiosClient'
 import { tokenStorage } from '../../utils/tokenStorage'
 import { authService } from './authService'
+import { refreshTokenStorage } from '../../utils/refreshTokenStorage'
 
-export type Role = 'ADMIN' | 'STAFF' | 'TEACHER' | 'STUDENT' //gán cứng 4 role
+export type Role = string 
 
 export interface User { //quy định khuôn mẫu của user (data model)
   id: number
@@ -29,9 +30,13 @@ const initialState: AuthState = { //trạng thái mặc định của Xác thự
 
 // Khôi phục phiên: xin access token mới bằng cookie refresh, rồi lấy thông tin user
 export const initAuth = createAsyncThunk('auth/init', async () => {
+  // Chưa từng đăng nhập (không có refresh token) thì khỏi gọi API
+  if (!refreshTokenStorage.get()) throw new Error('NO_SESSION')
+
   try {
-    await refreshAccessToken() // đợi trả về token mới
-    return await authService.me() //trang web nhận diện user và chuyển data vào Redux store
+    const refreshed = await refreshAccessToken()
+    // Backend mới trả sẵn user trong /auth/refresh, backend cũ thì hỏi thêm /auth/me
+    return refreshed.user ?? (await authService.me())
   } catch (error) {
     tokenStorage.clear()
     throw error

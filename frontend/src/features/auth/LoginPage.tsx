@@ -30,7 +30,7 @@ export default function LoginPage() {
     try {
       const data = await authService.login(values) //send u&p to api
       tokenStorage.set(data.accessToken) //save token
-      dispatch(setCredentials({ user: data.user })) //confirm user logged in
+      dispatch(setCredentials({ user: data.user })) //request save user to redux
     } catch (err) {
       if (isAxiosError(err) && err.response) {
         setError(err.response.data?.message ?? 'Đăng nhập thất bại')

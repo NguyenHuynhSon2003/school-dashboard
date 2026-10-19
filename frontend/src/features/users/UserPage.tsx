@@ -98,25 +98,25 @@ interface ListResult {
 }
 
 export default function UserPage() {
-  const me = useAppSelector((state) => state.auth.user)
+  const me = useAppSelector((state) => state.auth.user) // user who logged in
   const screens = Grid.useBreakpoint()
   const isMobile = screens.md === false
-  const { has } = usePermission()
+  const { has } = usePermission() // check permission existed
   const canUpdate = has(PERMISSIONS.USER_UPDATE)
   const canDelete = has(PERMISSIONS.USER_DELETE)
 
   const canCreate = has(PERMISSIONS.USER_CREATE)
-  const [modal, setModal] = useState<{ user: UserRecord | null } | null>(null)
+  const [modal, setModal] = useState<{ user: UserRecord | null } | null>(null) //open new page (add, edit)
 
-  const [searchInput, setSearchInput] = useState('')
-  const [role, setRole] = useState<Role | undefined>()
+  const [searchInput, setSearchInput] = useState('') // save text in search box
+  const [role, setRole] = useState<Role | undefined>() 
   const [status, setStatus] = useState<Status | undefined>()
   const [pageSize, setPageSize] = useState(10)
   const [pageState, setPageState] = useState({ page: 1, sig: '' })
   const [reload, setReload] = useState(0)
   const [result, setResult] = useState<ListResult | null>(null)
 
-  const search = useDebounce(searchInput.trim(), 400)
+  const search = useDebounce(searchInput.trim(), 1500)
 
 
   const filterSig = `${search}|${role ?? ''}|${status ?? ''}|${pageSize}`
