@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Avatar, Button, Drawer, Dropdown, Grid, Layout, Menu, Space, Tag } from 'antd'
+import { Avatar, Button, Drawer, Dropdown, Grid, Layout, Menu, Space, Tag, message } from 'antd'
 import type { MenuProps } from 'antd'
 import {
   LogoutOutlined,
@@ -14,6 +14,7 @@ import { usePermission } from '../../hooks/usePermission'
 import { appRoutes } from '../../routes/routeConfig'
 import { tokenStorage } from '../../utils/tokenStorage'
 import { authService } from '../../features/auth/authService'
+import type { MessageResponse } from '../../api/types'
 
 const { Header, Sider, Content } = Layout
 
@@ -42,13 +43,16 @@ export default function MainLayout() {
   }
 
   const handleLogout = async () => {
+    let text = 'Đăng xuất thành công'
     try {
-      await authService.logout() // báo server thu hồi refresh token
+      const res: MessageResponse | undefined = await authService.logout()
+      if (res?.message) text = res.message
     } catch {
       // lỗi mạng cũng không sao, vẫn đăng xuất phía trình duyệt
     }
     tokenStorage.clear()
     dispatch(logout())
+    message.success(text)
   }
 
   const userMenu: MenuProps = {

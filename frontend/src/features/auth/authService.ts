@@ -1,6 +1,7 @@
 import axiosClient from '../../api/axiosClient'
 import { refreshTokenStorage } from '../../utils/refreshTokenStorage'
 import type { User } from './authSlice'
+import type { MessageResponse } from '../../api/types'
 
 export interface LoginPayload {
   email: string
@@ -33,7 +34,7 @@ export const authService = {
 
   logout: () =>
     axiosClient
-      .post<void>('/auth/logout')
-      .then(() => undefined)
+      .post<MessageResponse>('/auth/logout')
+      .then((res) => res.data)
       .finally(() => refreshTokenStorage.clear()),
 }

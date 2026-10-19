@@ -5,6 +5,7 @@ import type {
   UserListResponse,
   UserRecord,
 } from './userTypes'
+import type { MessageResponse } from '../../api/types'
 
 export const userService = {
   list: (params: UserListParams) =>
@@ -16,5 +17,6 @@ export const userService = {
   update: (id: number, payload: Pick<UserFormValues, 'fullName' | 'phone' | 'role' | 'isActive'>) =>
     axiosClient.put<UserRecord>(`/users/${id}`, payload).then((res) => res.data),
 
-  remove: (id: number) => axiosClient.delete(`/users/${id}`).then(() => undefined),
+  remove: (id: number) =>
+    axiosClient.delete<MessageResponse>(`/users/${id}`).then((res) => res.data),
 }
