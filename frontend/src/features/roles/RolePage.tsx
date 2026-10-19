@@ -216,11 +216,16 @@ export default function RolePage() {
           <Tag color={ROLE_COLORS[selected.name] ?? 'default'}>{selected.userCount} người dùng</Tag>
         )}
                 {canCreate && (
-          <Button icon={<PlusOutlined />} onClick={() => setModalMode('create')}>
+          <Button icon={<PlusOutlined />} onClick={() =>{ form.resetFields(); setModalMode('create')}}>
             Thêm vai trò
           </Button>
         )}
-        {canUpdate && selected && <Button onClick={() => setModalMode('edit')}>Sửa thông tin</Button>}
+        {canUpdate && selected && <Button onClick={() => {
+              // Nạp đúng dữ liệu của role đang chọn vào form trước khi mở modal
+              form.setFieldsValue({
+                name: selected.name,
+                description: selected.description,
+              });setModalMode('edit')}}>Sửa thông tin</Button>}
         {canDelete && selected && selected.name !== 'ADMIN' && (
           <Popconfirm
             title={`Xóa vai trò ${selected.name}?`}
