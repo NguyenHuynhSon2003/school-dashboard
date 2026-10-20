@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, HttpCode, Patch } from '@nestjs/common';
+
+import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, HttpCode, Patch, Req } from '@nestjs/common';
 import { RolesService } from './roles.service.js';
 import { JwtAuthGuard } from '../auth/jwt-auth/jwt-auth.guard.js';
 import { PermissionsGuard } from '../permissions/permissions.guard.js';
@@ -23,6 +24,13 @@ export class RolesController {
     return this.rolesService.findAll();
   }
 
+    // Danh sách role được phép gán, dùng cho form người dùng (Staff không có role:read)
+  @Get('assignable')
+  @RequirePermissions('user:read')
+  findAssignable(@Req() req: any) {
+    return this.rolesService.findAssignable(req.user?.permissions ?? []);
+  }
+
   @Get(':id')
   @RequirePermissions('role:read')
   findOne(@Param('id') id: string) {
@@ -37,7 +45,7 @@ export class RolesController {
   }
 
   @Delete(':id')
-  @HttpCode(204)
+  // @HttpCode(204)
   @RequirePermissions('role:delete')
   remove(@Param('id') id: string) {
     return this.rolesService.remove(+id);

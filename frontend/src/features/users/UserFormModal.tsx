@@ -3,12 +3,15 @@ import { Form, Input, Modal, Select, Switch, message } from 'antd'
 import { isAxiosError } from 'axios'
 import { useAppSelector } from '../../app/hooks'
 import { userService } from './userService'
-import type { RoleItem } from '../roles/roleService'
+
+import type { RoleOption } from '../roles/roleService'
 import type { UserFormValues, UserRecord } from './userTypes'
 
 interface Props {
   user: UserRecord | null // null = thêm mới
-  roles: RoleItem[]
+
+  roles: RoleOption[]
+
   onClose: () => void
   onSaved: () => void
 }
@@ -48,7 +51,14 @@ export default function UserFormModal({ user, roles, onClose, onSaved }: Props) 
         })
         message.success('Đã cập nhật người dùng')
       } else {
-        await userService.create(values)
+        const { role, ...rest } = values
+        const roleId = roles.find((r) => r.name === role)?.id
+        if (!roleId) {
+          message.error('Vai trò không hợp lệ hoặc chưa tải xong, vui lòng thử lại')
+          setSaving(false)
+          return
+        }
+        await userService.create({ ...rest, roleId })
         message.success('Đã thêm người dùng')
       }
       onSaved()

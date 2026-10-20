@@ -4,8 +4,11 @@ import type {
   UserListParams,
   UserListResponse,
   UserRecord,
-} from "./userTypes";
-import type { MessageResponse } from "../../api/types";
+  UserStats,
+  UserCreatePayload,
+} from './userTypes'
+import type { MessageResponse } from '../../api/types'
+
 
 export const userService = {
   list: (params: UserListParams) =>
@@ -13,8 +16,8 @@ export const userService = {
       .get<UserListResponse>("/users", { params })
       .then((res) => res.data),
 
-  create: (payload: UserFormValues) =>
-    axiosClient.post<UserRecord>("/users", payload).then((res) => res.data),
+  create: (payload: UserCreatePayload) =>
+    axiosClient.post<UserRecord>('/users', payload).then((res) => res.data),
 
   update: (
     id: number,
@@ -26,6 +29,7 @@ export const userService = {
 
   remove: (id: number) =>
     axiosClient.delete<MessageResponse>(`/users/${id}`).then((res) => res.data),
-  // Thêm hàm lấy thống kê:
-  getStats: () => axiosClient.get('/users/stats').then((res) => res.data),
-};
+
+
+  stats: () => axiosClient.get<UserStats>('/users/stats').then((res) => res.data),
+}

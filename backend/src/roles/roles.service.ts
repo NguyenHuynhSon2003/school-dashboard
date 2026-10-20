@@ -79,6 +79,18 @@ export class RolesService {
     });
     return roles.map((role) => this.toItem(role));
   }
+  // Chỉ trả các role mà người gọi được phép gán (quyền của role ⊆ quyền của mình)
+  async findAssignable(currentPermissions: string[]) {
+    const roles = await this.roleRepository.find({
+      relations: { permissions: true } as any,
+      order: { id: 'ASC' },
+    });
+    return roles
+      .filter((r) =>
+        this.permissionsService.coversAll(currentPermissions, (r.permissions ?? []).map((p) => p.code)),
+      )
+      .map((r) => ({ id: r.id, name: r.name }));
+  }  
 
   async findOne(id: number): Promise<Role> {
     const role = await this.roleRepository.findOne({ where: { id } });
@@ -115,7 +127,9 @@ export class RolesService {
     return this.findItem(id);
   }
 
-  async remove(id: number): Promise<void> {
+
+  async remove(id: number): Promise<{ message: string }> {
+
     const role = await this.roleRepository.findOne({ where: { id }, relations: { users: true } as any });
     if (!role) throw new NotFoundException('Không tìm thấy vai trò');
     if (role.name.toUpperCase() === ADMIN_ROLE) {
@@ -126,6 +140,8 @@ export class RolesService {
       throw new ConflictException(`Vai trò đang có ${count} người dùng, hãy chuyển họ sang vai trò khác trước`);
     }
     await this.roleRepository.delete(id);
+
+    return { message: 'Đã xóa vai trò' };
   }
 
   async getPermissions(id: number): Promise<string[]> {

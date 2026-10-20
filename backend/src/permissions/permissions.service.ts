@@ -117,6 +117,13 @@ export class PermissionsService {
     return out;
   }
 
+  // true nếu tập quyền của người gọi bao phủ hết các quyền trong `codes`
+  coversAll(currentPermissions: string[], codes: string[]): boolean {
+    const mine = this.expand(currentPermissions);
+    return codes.every((c) => mine.has(c));
+  }
+
+
   /** Chặn leo thang đặc quyền: chỉ thao tác/gán được role có quyền nằm trong tập quyền của mình. */
   async assertCanAssignRole(currentPermissions: string[], roleId: number): Promise<void> {
     const mine = this.expand(currentPermissions);

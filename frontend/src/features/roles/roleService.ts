@@ -29,6 +29,10 @@ export interface RolePayload {
   permissions: string[]
 }
 
+
+export type RoleOption = Pick<RoleItem, 'id' | 'name'>
+
+
 const FALLBACK_PERMISSIONS: PermissionGroup[] = [
   {
     resource: 'user',
@@ -71,4 +75,7 @@ export const roleService = {
     axiosClient.patch<RoleItem>(`/roles/${id}`, payload).then((res) => res.data),
   remove: (id: number) =>
     axiosClient.delete<MessageResponse>(`/roles/${id}`).then((res) => res.data),
+
+  assignable: () => axiosClient.get<RoleOption[]>('/roles/assignable').then((res) => res.data),
+
 }

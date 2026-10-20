@@ -174,7 +174,7 @@ export class UsersService {
     return this.findOne(id);
   }
 
-  async remove(id: number, currentUser: any): Promise<void> {
+  async remove(id: number, currentUser: any): Promise<{ message: string }> {
     // Không cho phép tự xóa chính mình
     if (currentUser.id === id) {
       throw new ForbiddenException('Bạn không thể xóa chính mình');
@@ -186,6 +186,7 @@ export class UsersService {
     }
     await this.permissionsService.assertCanAssignRole(currentUser?.permissions ?? [], user.roleId);
     await this.userRepository.remove(user);
+    return { message: 'Đã xóa người dùng' };
   }
 
   // Số liệu cho Dashboard (1 request thay vì 4). Quyền kiểm tra ở controller: user:read

@@ -24,7 +24,9 @@ import type { Role } from '../auth/authSlice'
 import { canDeleteUser, canEditUser } from './userRules'
 import { userService } from './userService'
 import type { UserRecord } from './userTypes'
-import { useRoles } from '../roles/useRoles'
+
+// import { useRoles } from '../roles/useRoles'
+import { useAssignableRoles } from '../roles/useAssignableRoles'
 
 
 // const ROLE_OPTIONS = [
@@ -103,7 +105,8 @@ export default function UserPage() {
   const isMobile = screens.md === false
   const { has } = usePermission() // check permission existed
 
-  const { roles } = useRoles()
+
+  const { roles } = useAssignableRoles()
   const roleOptions = roles.map((r) => ({ value: r.name, label: r.name }))
 
   const canUpdate = has(PERMISSIONS.USER_UPDATE)
@@ -121,6 +124,15 @@ export default function UserPage() {
   const [result, setResult] = useState<ListResult | null>(null)
 
   const [search, setSearch] = useState('') // từ khóa đã chốt, chỉ đổi khi bấm Enter hoặc kính lúp
+
+  // Hàm đặt lại toàn bộ bộ lọc và phân trang về mặc định
+  const resetFilters = () => {
+    setSearchInput('')
+    setSearch('')
+    setRole(undefined)
+    setStatus(undefined)
+    setPageState({ page: 1, sig: '' })
+  }
 
 
 
@@ -287,7 +299,11 @@ export default function UserPage() {
             roles={roles}
             onClose={() => setModal(null)}
             onSaved={() => {
-            setModal(null)
+                  const wasCreate = modal.user === null // null nghĩa là đang ở chế độ Thêm mới
+                  setModal(null)
+                  if (wasCreate) {
+                    resetFilters()
+                  }
             setReload((r) => r + 1)
             }}
         />
