@@ -272,6 +272,7 @@ export default function RolePage() {
           <Form
             form={form}
             layout="vertical"
+            preserve={false}
             initialValues={
               modalMode === 'edit' && selected
                 ? { name: selected.name, description: selected.description }

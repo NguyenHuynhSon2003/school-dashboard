@@ -621,5 +621,16 @@ export const handlers = [
 
     return HttpResponse.json({ weekStart, owner: toOwner(target), items })
   }),
+    http.get('/api/v1/users/stats', async ({ request }) => {
+    await delay(200)
+    const g = guard(request, 'user:read')
+    if ('error' in g) return g.error
+    return HttpResponse.json({
+      total: users.length,
+      students: users.filter((u) => u.role === 'STUDENT').length,
+      teachers: users.filter((u) => u.role === 'TEACHER').length,
+      locked: users.filter((u) => !u.isActive).length,
+    })
+  }),
 
 ]

@@ -34,3 +34,12 @@ export interface UserFormValues {
   password?: string
   isActive: boolean
 }
+export interface UserStats {
+  total: number
+  students: number
+  teachers: number
+  locked: number
+}
+export interface UserCreatePayload extends Omit<UserFormValues, 'role'> {
+  roleId: number
+}

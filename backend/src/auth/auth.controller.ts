@@ -3,7 +3,6 @@ import { AuthService } from './auth.service.js';
 import { LoginDto } from '../users/dto/login.dto.js';
 import { JwtAuthGuard } from '../auth/jwt-auth/jwt-auth.guard.js';
 import { UsersService } from '../users/users.service.js';
-import { getPermissionsByRole } from './permissions.helper.js';
 
 @Controller('auth')
 export class AuthController {
@@ -35,18 +34,7 @@ export class AuthController {
   async getProfile(@Request() req: any) {
     const userId = req.user.userId || req.user.sub;
     const user = await this.usersService.findOne(userId);
-    const roleName: string = user.role;
-
-    return {
-      id: user.id,
-      email: user.email,
-      fullName: user.fullName,
-      phone: user.phone,
-      role: roleName,
-      permissions: getPermissionsByRole(roleName) || [],
-      isActive: user.isActive,
-      createdAt: user.createdAt,
-      avatarUrl: user.avatarUrl || null,
-    };
+    // Dùng chung với login/refresh, quyền đọc từ DB
+    return this.authService.buildUser(user);
   }
 }
