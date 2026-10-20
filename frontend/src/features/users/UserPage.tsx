@@ -13,26 +13,26 @@ import {
   Grid,
 } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { DeleteOutlined, EditOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
 import UserFormModal from './UserFormModal'
 import { isAxiosError } from 'axios'
 import { useAppSelector } from '../../app/hooks'
 import UserAvatar from '../../components/common/UserAvatar'
-import { useDebounce } from '../../hooks/useDebounce'
 import { usePermission } from '../../hooks/usePermission'
 import { PERMISSIONS, ROLE_COLORS } from '../../utils/constants'
 import type { Role } from '../auth/authSlice'
 import { canDeleteUser, canEditUser } from './userRules'
 import { userService } from './userService'
 import type { UserRecord } from './userTypes'
+import { useRoles } from '../roles/useRoles'
 
 
-const ROLE_OPTIONS = [
-  { value: 'ADMIN', label: 'Admin' },
-  { value: 'STAFF', label: 'Staff' },
-  { value: 'TEACHER', label: 'Teacher' },
-  { value: 'STUDENT', label: 'Student' },
-]
+// const ROLE_OPTIONS = [
+//   { value: 'ADMIN', label: 'Admin' },
+//   { value: 'STAFF', label: 'Staff' },
+//   { value: 'TEACHER', label: 'Teacher' },
+//   { value: 'STUDENT', label: 'Student' },
+// ]
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Hoạt động' },
@@ -68,7 +68,7 @@ const columns: TableColumnsType<UserRecord> = [
     title: 'Vai trò',
     dataIndex: 'role',
     key: 'role',
-    render: (role: Role) => <Tag color={ROLE_COLORS[role]}>{role}</Tag>,
+    render: (role: Role) => <Tag color={ROLE_COLORS[role] ?? 'default'}>{role}</Tag>,
   },
   {
     title: 'Trạng thái',
@@ -102,6 +102,10 @@ export default function UserPage() {
   const screens = Grid.useBreakpoint()
   const isMobile = screens.md === false
   const { has } = usePermission() // check permission existed
+
+  const { roles } = useRoles()
+  const roleOptions = roles.map((r) => ({ value: r.name, label: r.name }))
+
   const canUpdate = has(PERMISSIONS.USER_UPDATE)
   const canDelete = has(PERMISSIONS.USER_DELETE)
 
@@ -116,8 +120,7 @@ export default function UserPage() {
   const [reload, setReload] = useState(0)
   const [result, setResult] = useState<ListResult | null>(null)
 
-
-  const search = useDebounce(searchInput.trim(), 1500)
+  const [search, setSearch] = useState('') // từ khóa đã chốt, chỉ đổi khi bấm Enter hoặc kính lúp
 
 
 
@@ -155,8 +158,8 @@ export default function UserPage() {
 
   const handleDelete = async (u: UserRecord) => {
     try {
-      await userService.remove(u.id)
-      message.success(`Đã xóa ${u.fullName}`)
+      const res = await userService.remove(u.id)
+      message.success(res?.message || `Đã xóa ${u.fullName}`)
       // Vừa xóa dòng cuối của một trang không phải trang đầu thì lùi về trang trước
       if (result && result.items.length === 1 && page > 1) {
         setPageState({ page: page - 1, sig: filterSig })
@@ -222,18 +225,21 @@ export default function UserPage() {
         </Flex>
 
       <Flex wrap gap={8} style={{ marginBottom: 16 }}>
-        <Input
+        <Input.Search
           allowClear
-          prefix={<SearchOutlined />}
           placeholder="Tìm theo tên, email hoặc số điện thoại"
           value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
+          onChange={(e) => {
+            setSearchInput(e.target.value)
+            if (e.target.value === '') setSearch('') // xóa sạch ô thì trở về danh sách đầy đủ
+          }}
+          onSearch={(value) => setSearch(value.trim())}
           style={{ width: isMobile ? '100%' : 320 }}
         />
         <Select
           allowClear
           placeholder="Tất cả vai trò"
-          options={ROLE_OPTIONS}
+          options={roleOptions}
           value={role}
           onChange={(value?: Role) => setRole(value)}
           style={{ width: isMobile ? 'calc(50% - 4px)' : 160 }}
@@ -278,6 +284,7 @@ export default function UserPage() {
         <UserFormModal
             key={modal.user?.id ?? 'new'}
             user={modal.user}
+            roles={roles}
             onClose={() => setModal(null)}
             onSaved={() => {
             setModal(null)

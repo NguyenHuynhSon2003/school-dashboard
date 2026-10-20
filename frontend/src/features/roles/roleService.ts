@@ -1,4 +1,5 @@
 import axiosClient from '../../api/axiosClient'
+import type { MessageResponse } from '../../api/types'
 
 export interface RoleItem {
   id: number
@@ -28,14 +29,46 @@ export interface RolePayload {
   permissions: string[]
 }
 
+const FALLBACK_PERMISSIONS: PermissionGroup[] = [
+  {
+    resource: 'user',
+    label: 'Người dùng',
+    permissions: [
+      { code: 'user:read', action: 'read', label: 'Xem danh sách người dùng' },
+      { code: 'user:create', action: 'create', label: 'Thêm người dùng' },
+      { code: 'user:update', action: 'update', label: 'Sửa người dùng' },
+      { code: 'user:delete', action: 'delete', label: 'Xóa người dùng' },
+    ],
+  },
+  {
+    resource: 'role',
+    label: 'Vai trò & Phân quyền',
+    permissions: [
+      { code: 'role:read', action: 'read', label: 'Xem vai trò và ma trận quyền' },
+      { code: 'role:create', action: 'create', label: 'Thêm vai trò' },
+      { code: 'role:update', action: 'update', label: 'Sửa vai trò và phân quyền' },
+      { code: 'role:delete', action: 'delete', label: 'Xóa vai trò' },
+    ],
+  },
+  {
+    resource: 'timetable',
+    label: 'Thời khóa biểu',
+    permissions: [
+      { code: 'timetable:read', action: 'read', label: 'Xem thời khóa biểu của mọi người' },
+      { code: 'timetable:read_own', action: 'read_own', label: 'Chỉ xem thời khóa biểu của mình' },
+      { code: 'timetable:manage', action: 'manage', label: 'Quản lý thời khóa biểu' },
+    ],
+  },
+]
+
 export const roleService = {
   list: () => axiosClient.get<RoleItem[]>('/roles').then((res) => res.data),
   permissions: () =>
-    axiosClient.get<PermissionGroup[]>('/permissions').then((res) => res.data),
+    axiosClient.get<PermissionGroup[]>('/permissions').then((res) => res.data).catch(() => FALLBACK_PERMISSIONS),
   create: (payload: RolePayload) =>
     axiosClient.post<RoleItem>('/roles', payload).then((res) => res.data),
   update: (id: number, payload: RolePayload) =>
     axiosClient.patch<RoleItem>(`/roles/${id}`, payload).then((res) => res.data),
   remove: (id: number) =>
-    axiosClient.delete(`/roles/${id}`).then(() => undefined),
+    axiosClient.delete<MessageResponse>(`/roles/${id}`).then((res) => res.data),
 }

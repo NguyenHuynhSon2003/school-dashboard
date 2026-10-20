@@ -31,7 +31,9 @@ function getErrorMessage(err: unknown, fallback: string) {
 export default function RolePage() {
   const { has } = usePermission()
   const canUpdate = has(PERMISSIONS.ROLE_UPDATE)
-
+  const canCreate = has(PERMISSIONS.ROLE_CREATE)
+  const canDelete = has(PERMISSIONS.ROLE_DELETE)
+  
   const [roles, setRoles] = useState<RoleItem[]>([])
   const [groups, setGroups] = useState<PermissionGroup[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
@@ -39,8 +41,7 @@ export default function RolePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const canCreate = has(PERMISSIONS.ROLE_CREATE)
-  const canDelete = has(PERMISSIONS.ROLE_DELETE)
+
   const [modalMode, setModalMode] = useState<'create' | 'edit' | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [form] = Form.useForm<{ name: string; description: string }>()
@@ -147,12 +148,12 @@ export default function RolePage() {
   const handleDelete = async () => {
     if (!selected) return
     try {
-      await roleService.remove(selected.id)
+      const res = await roleService.remove(selected.id)
       const rest = roles.filter((r) => r.id !== selected.id)
       setRoles(rest)
       setSelectedId(rest[0]?.id ?? null)
       setDraft(rest[0]?.permissions ?? [])
-      message.success('Đã xóa vai trò')
+      message.success(res?.message || 'Đã xóa vai trò')
     } catch (err) {
       message.error(getErrorMessage(err, 'Không thể xóa vai trò'))
     }
